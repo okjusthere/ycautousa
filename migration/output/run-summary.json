@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-08-29T07:24:04.880Z",
+  "mode": "prepare",
+  "source": "https://www.ycautousa.com/",
+  "pagesVisited": [
+    "https://www.ycautousa.com/products.html",
+    "https://www.ycautousa.com/products_2.html",
+    "https://www.ycautousa.com/products_3.html",
+    "https://www.ycautousa.com/products_4.html",
+    "https://www.ycautousa.com/products_1.html",
+    "https://www.ycautousa.com/products_5.html",
+    "https://www.ycautousa.com/products_6.html",
+    "https://www.ycautousa.com/products_7.html",
+    "https://www.ycautousa.com/products_8.html",
+    "https://www.ycautousa.com/products_9.html",
+    "https://www.ycautousa.com/products_10.html",
+    "https://www.ycautousa.com/products_11.html",
+    "https://www.ycautousa.com/products_12.html"
+  ],
+  "recordCount": 34,
+  "availableCount": 34,
+  "draftCount": 0,
+  "imageCount": 309,
+  "preparedImageCount": 305,
+  "imageFailureCount": 0,
+  "duplicateImageCount": 4,
+  "crawlWarnings": []
+}

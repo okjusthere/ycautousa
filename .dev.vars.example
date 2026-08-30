@@ -1,0 +1,10 @@
+APP_ORIGIN=http://localhost:5173
+ENVIRONMENT=development
+CANONICAL_HOST=www.ycautousa.com
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+ADMIN_EMAILS=admin@example.com
+DEV_ADMIN_EMAIL=admin@example.com
+EMAIL_FROM=leads@example.com
+EMAIL_TO=sophie@youxuancars.com
+IP_HASH_SALT=replace-with-a-local-only-random-value

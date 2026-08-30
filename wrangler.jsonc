@@ -1,0 +1,87 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "yc-auto-web",
+  "main": "workers/index.ts",
+  "compatibility_date": "2025-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "yc-auto-prod",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "VEHICLE_IMAGES",
+      "bucket_name": "yc-auto-vehicle-images",
+    },
+  ],
+  "images": {
+    "binding": "IMAGES",
+  },
+  "send_email": [
+    {
+      "name": "EMAIL",
+    },
+  ],
+  "vars": {
+    "APP_ORIGIN": "http://localhost:5173",
+    "CANONICAL_HOST": "www.ycautousa.com",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+    "ADMIN_EMAILS": "admin@example.com",
+    "EMAIL_FROM": "leads@example.com",
+    "EMAIL_TO": "sophie@youxuancars.com",
+    "ENVIRONMENT": "development",
+    "DEV_ADMIN_EMAIL": "admin@example.com",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "env": {
+    "production": {
+      "name": "yc-auto-web",
+      "vars": {
+        "APP_ORIGIN": "https://www.ycautousa.com",
+        "CANONICAL_HOST": "www.ycautousa.com",
+        "TURNSTILE_SITE_KEY": "REPLACE_WITH_TURNSTILE_SITE_KEY",
+        "ADMIN_EMAILS": "REPLACE_WITH_ADMIN_EMAILS",
+        "ACCESS_TEAM_DOMAIN": "REPLACE_WITH_ACCESS_TEAM_DOMAIN",
+        "ACCESS_AUD_TAG": "REPLACE_WITH_ACCESS_AUD_TAG",
+        "EMAIL_FROM": "leads@ycautousa.com",
+        "EMAIL_TO": "sophie@youxuancars.com",
+        "ENVIRONMENT": "production",
+        "DEV_ADMIN_EMAIL": "",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "yc-auto-prod",
+          "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "VEHICLE_IMAGES",
+          "bucket_name": "yc-auto-vehicle-images",
+        },
+      ],
+      "images": {
+        "binding": "IMAGES",
+      },
+      "send_email": [
+        {
+          "name": "EMAIL",
+          "remote": true,
+        },
+      ],
+    },
+  },
+}
