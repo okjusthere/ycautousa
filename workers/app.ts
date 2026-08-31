@@ -304,6 +304,8 @@ async function submitLead(
           options.fetchImpl ?? fetch,
         );
   const origin = env.APP_ORIGIN ? new URL(env.APP_ORIGIN).hostname : null;
+  const usesTurnstileTestKey =
+    env.TURNSTILE_SITE_KEY === "1x00000000000000000000AA";
   if (!tokenResult.success)
     return errorResponse(
       "Please complete the verification and try again.",
@@ -314,6 +316,7 @@ async function submitLead(
   if (
     tokenResult.hostname &&
     origin &&
+    !usesTurnstileTestKey &&
     tokenResult.hostname !== origin &&
     !tokenResult.hostname.endsWith(`.${origin}`)
   )

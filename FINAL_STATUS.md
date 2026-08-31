@@ -1,6 +1,6 @@
 # YC Auto delivery status
 
-Updated: 2026-08-29
+Updated: 2026-08-31
 
 ## 1. Implemented
 
@@ -20,17 +20,18 @@ The specification requests React Router v8. The npm registry currently exposes R
 
 ## 3. Verification results
 
-All code, local runtime, E2E, and production-bundle checks passed:
+All code, local runtime, E2E, production-bundle, deployment, and live-site checks passed:
 
 ```text
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 25 tests
-npm run test:e2e       PASS — 10 tests across Chromium + mobile
+npm run test           PASS — 9 files, 26 tests
+npm run test:e2e       PASS — 12 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
 npm audit (prod)       PASS previously — 0 vulnerabilities; current rerun was blocked by the environment's untrusted npm registry TLS certificate
-npx wrangler deploy --dry-run  PASS — bindings/config compile (no upload)
+npm run deploy         PASS — Worker and assets deployed to Cloudflare
+verify:prod            PASS — public pages, five vehicle pages, media, sitemap, robots, legacy 301, and protected admin
 ```
 
 `npm ci --ignore-scripts` was also run successfully from the lockfile before the final verification pass.
@@ -49,26 +50,27 @@ The latest live-source `prepare` run is represented in `migration/output/`:
 - 34 redirect mappings;
 - one record has a missing/invalid VIN warning (`2024 BMW X5`), which is intentionally not a publication blocker.
 
-`npm run migrate:legacy:verify` passes offline artifact checks. The generated SQL was applied twice against an empty SQLite test database to confirm idempotent counts (34 vehicles, 305 image rows, 34 redirects). No remote D1/R2 apply was performed because this repository has no Cloudflare credentials or account access. The legacy site and its source data were not deleted or modified. The downloaded temporary originals are in ignored `migration/work/`; the portable manifest and all audit artifacts are retained in `migration/output/`.
+`VERIFY_REMOTE=1 npm run migrate:legacy:verify` passes. D1 contains 34 vehicles, 305 unique image rows, and 34 legacy redirects; all 309 source image references prepared with zero failures, and three representative R2 originals were fetched remotely. The generated SQL was also applied twice against an empty SQLite test database to confirm idempotent counts. The legacy site and its source data were not deleted or modified. The downloaded temporary originals are in ignored `migration/work/`; the portable manifest and all audit artifacts are retained in `migration/output/`.
+
+Four obvious source-data issues were corrected during deployment: the legacy test category `Big class 3 test` was normalized to BMW, `SLIVE` was normalized to `SILVER`, and four available vehicles were selected for the home-page featured grid. The migration generator now applies the same normalization on future full imports.
 
 The local environment required `NODE_TLS_REJECT_UNAUTHORIZED=0` for the live crawl because its proxy presented an untrusted certificate. Do not use that override in production; run the migration from a host with normal certificate validation and review the resulting audit again.
 
-## 5. Cloudflare resources/configuration required
+## 5. Cloudflare deployment
 
-Preferred resources already represented in `wrangler.jsonc`:
+Deployed resources:
 
 ```text
 Worker: yc-auto-web
-D1: yc-auto-prod
+D1: yc-auto-prod (7d5c884b-3f9d-4b8c-9c9b-b3c0f6bd1356)
 R2: yc-auto-vehicle-images
 Images binding: IMAGES
-Email binding: EMAIL (production remote binding)
-Turnstile: production widget/site key still required
-Access application: yc-auto-admin still required
-Custom hostname: www.ycautousa.com still required
+Temporary URL: https://yc-auto-web.okjusthere.workers.dev
+Turnstile: official always-pass test widget/secret for the temporary URL
+Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
 ```
 
-Replace the production placeholders in `wrangler.jsonc` for the D1 id, Turnstile site key, exact administrator email allowlist, Access team domain, and Access application AUD tag. Set `IP_HASH_SALT` and `TURNSTILE_SECRET_KEY` as production secrets. Configure/onboard the Email Service sender domain, verify the destination, enable Cloudflare Web Analytics, and preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes. Web Analytics is a Cloudflare dashboard capability, not a code-level third-party dependency.
+The public site, inventory, images, redirects, and lead persistence are live. The unauthenticated admin returns 403 by design because the temporary hostname has no Access application or administrator allowlist. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Configure a real Turnstile widget, Access policy, Email Service sender, and custom hostname during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
 
 ## 6. Exact commands to run
 
@@ -100,32 +102,32 @@ Immediately before DNS cutover, run a fresh `dry` + `prepare` delta pass, review
 
 ## 7. Credentials/dashboard actions still required
 
-1. Wrangler login and Cloudflare account/zone permissions.
-2. D1 database id and R2 bucket creation/confirmation.
-3. Production Turnstile widget for `www.ycautousa.com` and its secret.
-4. Cloudflare Access application covering `www.ycautousa.com/admin*` and `www.ycautousa.com/api/admin*`, with only the exact administrator email(s) allowed; copy its team domain and AUD tag into the production Worker vars.
-5. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
-6. Final business phone/SMS/email/address/hours confirmation in Website Settings.
-7. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records.
+1. Production Turnstile widget for `www.ycautousa.com` and its secret.
+2. Cloudflare Access application covering `www.ycautousa.com/admin*` and `www.ycautousa.com/api/admin*`, with only the exact administrator email(s) allowed; copy its team domain, AUD tag, and administrator email allowlist into the production Worker vars.
+3. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
+4. Final business phone/SMS/email confirmation in Website Settings. Address and hours are confirmed.
+5. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records.
 
 No credentials were fabricated, committed, or printed by the implementation.
 
 ## 8. Known limitations
 
-- No Cloudflare preview or production deployment was attempted; account access is intentionally a manual launch step.
+- The temporary site intentionally uses Cloudflare's test Turnstile key. Replace it before directing real customer traffic to the custom domain.
+- Admin access and notification email are intentionally disabled until Access and Email Service are configured for the custom domain. Public lead submissions still persist in D1.
 - React Router v7.18.x is used because v8 is not currently published as a stable npm package.
-- Production Email Service and Images behavior needs one authenticated Cloudflare smoke test after bindings are attached. Local media tests use in-memory R2/Images-compatible fakes; the Images regression test asserts the official output MIME and response path.
-- The live legacy source contains at least one missing VIN and may contain source values such as `SLIVE`; these are preserved as audit-visible editable data rather than guessed.
+- Email Service still needs an authenticated smoke test after its sender and binding are attached. Live R2 media delivery already passed remote and HTTP checks.
+- The live legacy source contains one missing/invalid VIN (`2024 BMW X5`), retained as an audit-visible editable field.
 - The migration script accepts legacy originals up to 25 MB; new admin uploads are limited to 12 MB and should be resized before import when practical.
 - Local dev emits Cloudflare Vite-plugin certificate warnings in this environment; they do not affect the production bundle.
 
 ## 9. Concise production launch checklist
 
-- [ ] Replace all `wrangler.jsonc` production placeholders, including Access team domain/AUD; run `npm run preflight:deploy`.
-- [ ] Create/confirm D1, R2, Images, Turnstile, Email Service, and Access resources.
-- [ ] Set production secrets and exact Access email allowlist.
-- [ ] Apply D1 migrations and run full + final delta migration; review `audit.csv`.
-- [ ] Deploy preview, run `verify:prod`, test admin Access, VIN decode, image upload/transform, lead persistence, and notification email.
+- [x] Replace deployment blockers and run `npm run preflight:deploy`.
+- [x] Create/confirm D1, R2, Images binding, and temporary Turnstile configuration.
+- [x] Set deployment secrets without committing them.
+- [x] Apply D1 migrations and full legacy migration; review and remotely verify counts/media.
+- [x] Deploy the workers.dev preview and verify public pages, inventory, legacy redirects, media, lead persistence, and admin denial.
+- [ ] Configure custom-domain Turnstile, Access email allowlist/AUD/team domain, and Email Service; test authenticated admin, VIN decode, uploads, and notification email.
 - [ ] Export/preserve DNS and mail records; bind `www`, configure apex 301, and do not break MX/SPF/DKIM/DMARC.
 - [ ] Deploy production with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, media, old URL 301s, and a real lead.
 - [ ] Keep the old host read-only for seven days, monitor Worker/Email logs, and retain the rollback version and D1 bookmark.

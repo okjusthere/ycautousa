@@ -8,7 +8,7 @@
     "dev:worker": "wrangler dev workers/index.ts --local",
     "build": "vite build",
     "preflight:deploy": "tsx scripts/preflight-deploy.ts",
-    "deploy": "npm run preflight:deploy && CLOUDFLARE_ENV=production npm run build && wrangler deploy",
+    "deploy": "npm run preflight:deploy && CLOUDFLARE_ENV=production npm run build && wrangler deploy --env production",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",

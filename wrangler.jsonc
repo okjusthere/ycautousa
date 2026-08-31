@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "yc-auto-prod",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "7d5c884b-3f9d-4b8c-9c9b-b3c0f6bd1356",
       "migrations_dir": "migrations",
     },
   ],
@@ -26,11 +26,6 @@
   "images": {
     "binding": "IMAGES",
   },
-  "send_email": [
-    {
-      "name": "EMAIL",
-    },
-  ],
   "vars": {
     "APP_ORIGIN": "http://localhost:5173",
     "CANONICAL_HOST": "www.ycautousa.com",
@@ -48,13 +43,13 @@
     "production": {
       "name": "yc-auto-web",
       "vars": {
-        "APP_ORIGIN": "https://www.ycautousa.com",
-        "CANONICAL_HOST": "www.ycautousa.com",
-        "TURNSTILE_SITE_KEY": "REPLACE_WITH_TURNSTILE_SITE_KEY",
-        "ADMIN_EMAILS": "REPLACE_WITH_ADMIN_EMAILS",
-        "ACCESS_TEAM_DOMAIN": "REPLACE_WITH_ACCESS_TEAM_DOMAIN",
-        "ACCESS_AUD_TAG": "REPLACE_WITH_ACCESS_AUD_TAG",
-        "EMAIL_FROM": "leads@ycautousa.com",
+        "APP_ORIGIN": "https://yc-auto-web.okjusthere.workers.dev",
+        "CANONICAL_HOST": "",
+        "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+        "ADMIN_EMAILS": "",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD_TAG": "",
+        "EMAIL_FROM": "",
         "EMAIL_TO": "sophie@youxuancars.com",
         "ENVIRONMENT": "production",
         "DEV_ADMIN_EMAIL": "",
@@ -63,7 +58,7 @@
         {
           "binding": "DB",
           "database_name": "yc-auto-prod",
-          "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+          "database_id": "7d5c884b-3f9d-4b8c-9c9b-b3c0f6bd1356",
           "migrations_dir": "migrations",
         },
       ],
@@ -76,12 +71,6 @@
       "images": {
         "binding": "IMAGES",
       },
-      "send_email": [
-        {
-          "name": "EMAIL",
-          "remote": true,
-        },
-      ],
     },
   },
 }

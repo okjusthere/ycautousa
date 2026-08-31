@@ -228,6 +228,36 @@ describe("Worker API integration", () => {
     expect(row?.emailStatus).toBe("failed");
   });
 
+  it("accepts Cloudflare's dummy hostname only with the official test site key", async () => {
+    const previewEnv: Env = {
+      ...env,
+      APP_ORIGIN: "https://yc-auto-web.example.workers.dev",
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+    };
+    const response = await handleRequest(
+      new Request("https://yc-auto-web.example.workers.dev/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Preview Buyer",
+          email: "preview@example.com",
+          leadType: "contact",
+          preferredContact: "email",
+          turnstileToken: "dummy-token",
+        }),
+      }),
+      previewEnv,
+      undefined,
+      {
+        turnstileImpl: async () => ({
+          success: true,
+          hostname: "dummy_key",
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+  });
+
   it("keeps sold records in the sitemap but excludes drafts", async () => {
     const create = async (title: string, status: string) => {
       const response = await handleRequest(

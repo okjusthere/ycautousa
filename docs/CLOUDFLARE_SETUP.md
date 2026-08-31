@@ -49,7 +49,7 @@ Use an Allow policy containing only the same exact administrator emails. Never u
 ```bash
 npm run db:migrate:remote
 CLOUDFLARE_ENV=production npm run build
-npx wrangler deploy
+npx wrangler deploy --env production
 APP_ORIGIN=https://<preview-or-production-origin> npm run verify:prod
 ```
 
