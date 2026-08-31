@@ -23,6 +23,17 @@ test.describe("public showroom", () => {
         ),
       )
       .toBe(true);
+    const teamLayout = await team.evaluate((image: HTMLImageElement) => ({
+      fit: getComputedStyle(image).objectFit,
+      naturalRatio: image.naturalWidth / image.naturalHeight,
+      renderedRatio:
+        image.getBoundingClientRect().width /
+        image.getBoundingClientRect().height,
+    }));
+    expect(teamLayout.fit).toBe("contain");
+    expect(
+      Math.abs(teamLayout.naturalRatio - teamLayout.renderedRatio),
+    ).toBeLessThan(0.01);
   });
 
   test("home, inventory, filters, and vehicle detail are navigable", async ({

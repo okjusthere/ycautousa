@@ -237,6 +237,15 @@ h3 {
   background: #fff;
   color: var(--ink);
 }
+.button--danger {
+  border-color: #b8271e;
+  background: transparent;
+  color: #a82119;
+}
+.button--danger:hover {
+  background: #a82119;
+  color: #fff;
+}
 .button--small {
   min-height: 38px;
   padding-inline: 15px;
@@ -1465,9 +1474,11 @@ select {
   margin: 56px 0 0;
 }
 .about-team-photo img {
+  display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   object-position: center;
 }
 .about-team-photo figcaption {
@@ -2243,6 +2254,10 @@ select {
   color: var(--red);
   background: #f1e9e4;
 }
+.row-actions .icon-button.danger:hover {
+  color: #fff;
+  background: #a82119;
+}
 .admin-table tbody tr:hover {
   background: #f5f2eb;
 }
@@ -2374,6 +2389,28 @@ select {
   margin: 0;
   color: #858781;
   font-size: 12px;
+}
+.form-section--danger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  border: 1px solid #ddc1bc;
+  background: #fff8f5;
+}
+.form-section--danger h2 {
+  margin: 5px 0 7px;
+  font-size: 24px;
+}
+.form-section--danger p:not(.eyebrow) {
+  max-width: 650px;
+  margin: 0;
+  color: #76716c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.form-section--danger .button {
+  flex: 0 0 auto;
 }
 .editor-fields {
   display: grid;
@@ -3449,6 +3486,13 @@ select {
   .editor-fields .field:nth-child(1),
   .editor-fields--three .field:nth-child(1) {
     grid-column: auto;
+  }
+  .form-section--danger {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .form-section--danger .button {
+    width: 100%;
   }
   .vin-field {
     align-items: stretch;

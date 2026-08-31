@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { handleRequest } from "../../workers/app";
 import type { Env } from "../../workers/env";
+import type { Vehicle } from "../../lib/types";
 import { SqliteD1 } from "../helpers/sqlite-d1";
 
 function setup() {
@@ -66,6 +67,52 @@ describe("Worker API integration", () => {
       { ...env, DEV_ADMIN_EMAIL: undefined },
     );
     expect(denied.status).toBe(401);
+  });
+
+  it("soft deletes a vehicle from public and admin inventory", async () => {
+    const create = await handleRequest(
+      new Request("http://localhost:5173/api/admin/vehicles", {
+        method: "POST",
+        headers: adminHeaders,
+        body: JSON.stringify({
+          title: "2026 Inventory Removal Test",
+          status: "available",
+          featured: false,
+          make: "Toyota",
+          model: "RAV4",
+          features: [],
+        }),
+      }),
+      env,
+    );
+    const id = ((await create.json()) as { id: string }).id;
+    const remove = await handleRequest(
+      new Request(`http://localhost:5173/api/admin/vehicles/${id}/delete`, {
+        method: "POST",
+        headers: adminHeaders,
+      }),
+      env,
+    );
+    expect(remove.status).toBe(200);
+
+    const [adminVehicle, publicInventory, adminInventory] = await Promise.all([
+      handleRequest(
+        new Request(`http://localhost:5173/api/admin/vehicles/${id}`),
+        env,
+      ),
+      handleRequest(new Request("http://localhost:5173/api/inventory"), env),
+      handleRequest(
+        new Request("http://localhost:5173/api/admin/vehicles"),
+        env,
+      ),
+    ]);
+    expect(adminVehicle.status).toBe(404);
+    expect(
+      ((await publicInventory.json()) as { vehicles: Vehicle[] }).vehicles,
+    ).not.toEqual(expect.arrayContaining([expect.objectContaining({ id })]));
+    expect(
+      ((await adminInventory.json()) as { vehicles: Vehicle[] }).vehicles,
+    ).not.toEqual(expect.arrayContaining([expect.objectContaining({ id })]));
   });
 
   it("keeps sold pages public and persists leads before email failures", async () => {

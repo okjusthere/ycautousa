@@ -5,7 +5,7 @@ Updated: 2026-08-31
 ## 1. Implemented
 
 - Responsive YC Auto USA public showroom: home, live inventory filters/sort/pagination, vehicle detail gallery with mobile swipe and sticky CTAs, similar inventory, about, contact, privacy, terms, sitemap, robots, canonical/OG metadata, AutoDealer/Car JSON-LD, and legacy 301 redirect resolution.
-- Protected admin workspace: overview counts, inventory search/filter/table, quick price/mileage/status edits, bulk status changes, duplicate/preview/hide actions, one-page vehicle editor, VIN Smart Fill, client resize + sequential multi-photo upload, drag/button reorder, cover selection, retry and soft delete, lead inbox/status/notes, editable website settings, and read-only audit log.
+- Protected admin workspace: overview counts, inventory search/filter/table, quick price/mileage/status edits, bulk status changes, duplicate/preview/hide/remove actions, one-page vehicle editor with linked make/model suggestions and manual entry, VIN Smart Fill, client resize + sequential multi-photo upload, drag/button reorder, cover selection, retry and soft delete, lead inbox/status/notes, editable website settings, and read-only audit log.
 - Cloudflare Worker request boundary with D1 prepared-statement repositories, private R2 media streaming and width/format allowlists, official Images binding transforms (`image/*` output MIME + transformation `.response()`), pinned Access JWKS/RS256 verification with issuer/AUD/time checks, exact email allowlist checks, same-origin mutation checks, body limits, rate limiting, Turnstile Siteverify adapter, graceful Email Service notification fallback, conversion event tracking, security headers, and short/immutable caching policies.
 - Server-side NHTSA vPIC VIN adapter with local VIN validation, D1 cache hits/touch/update, normalized fields, one conservative retry, five-second timeout, blank-field-only UI merge, and non-blocking outage behavior.
 - Repeatable legacy migration utility with polite pagination discovery, label-based parsing, source-value preservation, normalization/audit warnings, image filtering/download validation/retry/hash deduplication, generated SQL/manifests/redirects, explicit apply confirmation, and offline verification.
@@ -26,7 +26,7 @@ All code, local runtime, E2E, production-bundle, deployment, and live-site check
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 26 tests
+npm run test           PASS — 9 files, 27 tests
 npm run test:e2e       PASS — 12 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
 npm audit (prod)       PASS previously — 0 vulnerabilities; current rerun was blocked by the environment's untrusted npm registry TLS certificate

@@ -45,6 +45,7 @@ import {
   vehicleImage,
 } from "../components/VehicleCard";
 import { LeadForm } from "../components/LeadForm";
+import { modelsForMake, VEHICLE_MAKES } from "./vehicle-catalog";
 
 function usePageMeta(
   title: string,
@@ -556,15 +557,7 @@ function FilterControls({
           onChange={(event) => update("make", event.target.value)}
         >
           <option value="">All makes</option>
-          {[
-            "Toyota",
-            "Honda",
-            "Mercedes-Benz",
-            "Subaru",
-            "Kia",
-            "Ford",
-            "Porsche",
-          ].map((make) => (
+          {VEHICLE_MAKES.map((make) => (
             <option key={make}>{make}</option>
           ))}
         </select>
@@ -1596,6 +1589,35 @@ function AdminVehiclesPage() {
       setBusy("");
     }
   };
+  const removeVehicle = async (vehicle: Vehicle) => {
+    if (
+      !window.confirm(
+        `Remove ${vehicle.title} from inventory? This keeps its audit history but removes it from the storefront and admin inventory.`,
+      )
+    )
+      return;
+    setBusy(vehicle.id);
+    setActionError("");
+    try {
+      await mutate(`/api/admin/vehicles/${vehicle.id}/delete`, "POST");
+      setData((old) =>
+        old
+          ? {
+              ...old,
+              vehicles: old.vehicles.filter((item) => item.id !== vehicle.id),
+              total: Math.max(0, old.total - 1),
+            }
+          : old,
+      );
+      setSelectedIds((old) => old.filter((item) => item !== vehicle.id));
+    } catch (reason) {
+      setActionError(
+        reason instanceof Error ? reason.message : "Unable to remove vehicle.",
+      );
+    } finally {
+      setBusy("");
+    }
+  };
   return (
     <div className="admin-list-page">
       <div className="admin-page-intro">
@@ -1655,17 +1677,7 @@ function AdminVehiclesPage() {
           }}
         >
           <option value="">All makes</option>
-          {[
-            "Toyota",
-            "Honda",
-            "Mercedes-Benz",
-            "Subaru",
-            "Kia",
-            "Ford",
-            "Porsche",
-            "BMW",
-            "Nissan",
-          ].map((make) => (
+          {VEHICLE_MAKES.map((make) => (
             <option key={make} value={make}>
               {make}
             </option>
@@ -1839,6 +1851,14 @@ function AdminVehiclesPage() {
                       aria-label={`Hide ${vehicle.title}`}
                     >
                       <Icon name="close" size={16} />
+                    </button>
+                    <button
+                      className="icon-button danger"
+                      disabled={busy === vehicle.id}
+                      onClick={() => removeVehicle(vehicle)}
+                      aria-label={`Remove ${vehicle.title}`}
+                    >
+                      <Icon name="trash" size={16} />
                     </button>
                   </div>
                 </td>
@@ -2040,6 +2060,7 @@ function AdminVehicleEditorPage() {
   const [previewSlug, setPreviewSlug] = useState("");
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [decoding, setDecoding] = useState(false);
@@ -2157,6 +2178,26 @@ function AdminVehicleEditorPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+  async function removeVehicle() {
+    if (isNew || !id) return;
+    if (
+      !window.confirm(
+        `Remove ${state.title || "this vehicle"} from inventory? This keeps its audit history but removes it from the storefront and admin inventory.`,
+      )
+    )
+      return;
+    setDeleting(true);
+    setError("");
+    try {
+      await mutate(`/api/admin/vehicles/${id}/delete`, "POST");
+      navigate("/admin/vehicles", { replace: true });
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Unable to remove vehicle.",
+      );
+      setDeleting(false);
     }
   }
   async function uploadOne(file: File): Promise<void> {
@@ -2387,17 +2428,31 @@ function AdminVehicleEditorPage() {
             </Field>
             <Field label="Make">
               <input
+                list="vehicle-makes"
                 value={state.make}
                 onChange={(event) => set("make", event.target.value)}
-                placeholder="Toyota"
+                placeholder="Choose or type a make"
               />
+              <datalist id="vehicle-makes">
+                {VEHICLE_MAKES.map((make) => (
+                  <option key={make} value={make} />
+                ))}
+              </datalist>
             </Field>
             <Field label="Model">
               <input
+                list="vehicle-models"
                 value={state.model}
                 onChange={(event) => set("model", event.target.value)}
-                placeholder="RAV4"
+                placeholder={
+                  state.make ? "Choose or type a model" : "Choose a make first"
+                }
               />
+              <datalist id="vehicle-models">
+                {modelsForMake(state.make).map((model) => (
+                  <option key={model} value={model} />
+                ))}
+              </datalist>
             </Field>
             <Field label="Trim">
               <input
@@ -2697,6 +2752,27 @@ function AdminVehicleEditorPage() {
             </span>
           </label>
         </section>
+        {!isNew && (
+          <section className="form-section form-section--danger">
+            <div>
+              <p className="eyebrow">Inventory removal</p>
+              <h2>Remove this vehicle</h2>
+              <p>
+                The listing disappears from the storefront and inventory list.
+                Its audit history is retained for recovery and reporting.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="button button--danger"
+              disabled={deleting}
+              onClick={removeVehicle}
+            >
+              <Icon name="trash" size={16} />
+              {deleting ? "Removing…" : "Remove vehicle"}
+            </button>
+          </section>
+        )}
       </form>
     </div>
   );
