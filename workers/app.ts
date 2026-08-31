@@ -778,7 +778,7 @@ async function decoratePublicHtml(
   let title = "YC Auto USA | Quality pre-owned vehicles";
   let description = "Quality pre-owned vehicles in Flushing, New York.";
   let snippet = "Find your next car at YC Auto USA in Flushing, New York.";
-  let socialImage = `${origin}/vehicle-placeholder.svg`;
+  let socialImage = `${origin}/brand/team.jpg`;
   let structured: Record<string, unknown> | null = null;
   if (url.pathname === "/") {
     try {
@@ -791,6 +791,8 @@ async function decoratePublicHtml(
         "@type": "AutoDealer",
         name: settings.businessName,
         url: origin,
+        logo: `${origin}/brand/logo-dark.png`,
+        image: `${origin}/brand/team.jpg`,
         telephone: settings.phone,
         email: settings.email,
         address: { "@type": "PostalAddress", streetAddress: settings.address },

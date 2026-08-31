@@ -48,6 +48,7 @@ See:
 - [Admin guide](docs/ADMIN_GUIDE.md)
 - [Operations](docs/OPERATIONS.md)
 - [Security](docs/SECURITY.md)
+- [Brand assets](docs/BRAND_ASSETS.md)
 
 ## Repository map
 

@@ -179,6 +179,8 @@ function HomePage() {
             "@type": "AutoDealer",
             name: settings.businessName,
             url: window.location.origin,
+            logo: `${window.location.origin}/brand/logo-dark.png`,
+            image: `${window.location.origin}/brand/team.jpg`,
             telephone: settings.phone,
             email: settings.email,
             address: {
@@ -1115,6 +1117,17 @@ function AboutPage() {
         </div>
         <div className="editorial-body">
           <p>{settings.aboutText}</p>
+          <figure className="about-team-photo">
+            <img
+              src="/brand/team.jpg"
+              alt="The Your Choice Auto Group team at the Flushing showroom"
+              width="1920"
+              height="1435"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>Your Choice Auto Group · Flushing, New York</figcaption>
+          </figure>
           <div className="about-notes">
             <div>
               <span>01</span>
@@ -1129,7 +1142,7 @@ function AboutPage() {
             <div>
               <span>03</span>
               <strong>Find us locally</strong>
-              <p>167-04 Northern Blvd., Flushing, NY.</p>
+              <p>{settings.address}</p>
             </div>
           </div>
           <Link className="button button--dark" to="/inventory">

@@ -1,6 +1,30 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("public showroom", () => {
+  test("official brand logo and team photo load", async ({ page }) => {
+    await page.goto("/");
+    const logo = page.locator(".site-header .wordmark-logo");
+    await expect(logo).toBeVisible();
+    await expect
+      .poll(() =>
+        logo.evaluate(
+          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+
+    await page.goto("/about");
+    const team = page.locator(".about-team-photo img");
+    await expect(team).toBeVisible();
+    await expect
+      .poll(() =>
+        team.evaluate(
+          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+  });
+
   test("home, inventory, filters, and vehicle detail are navigable", async ({
     page,
   }) => {

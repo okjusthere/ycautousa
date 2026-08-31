@@ -10,8 +10,8 @@ export const demoSettings: SiteSettings = {
   phone: "718-799-0606",
   smsNumber: "718-799-0606",
   email: "sophie@youxuancars.com",
-  address: "167-04 Northern Blvd., Flushing, NY 11358",
-  businessHours: "Mon–Sat 9:00 AM–7:00 PM · Sunday by appointment",
+  address: "167-04 Northern Blvd, Flushing, NY 11358",
+  businessHours: "Mon–Fri 10:00 AM–6:00 PM · Sat–Sun 12:00 PM–5:00 PM",
   heroTitle: "Find Your Next Car",
   heroSubtitle: "Quality pre-owned vehicles in Flushing, New York.",
   aboutText:

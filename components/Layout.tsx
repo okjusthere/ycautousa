@@ -6,16 +6,23 @@ import { getHome } from "../src/api";
 import { Icon } from "./Icon";
 
 export function Wordmark({ inverse = false }: { inverse?: boolean }) {
+  const logo = inverse
+    ? { src: "/brand/logo-light.png", width: 838, height: 219 }
+    : { src: "/brand/logo-dark.png", width: 1026, height: 210 };
   return (
     <Link
       to="/"
       className={`wordmark ${inverse ? "wordmark--inverse" : ""}`}
       aria-label="YC Auto USA home"
     >
-      <span className="wordmark-mark">YC</span>
-      <span className="wordmark-copy">
-        AUTO <em>USA</em>
-      </span>
+      <img
+        className="wordmark-logo"
+        src={logo.src}
+        alt=""
+        width={logo.width}
+        height={logo.height}
+        decoding="async"
+      />
     </Link>
   );
 }
@@ -153,7 +160,7 @@ export function AdminLayout() {
       </a>
       <aside className={`admin-sidebar ${open ? "admin-sidebar--open" : ""}`}>
         <div className="admin-brand">
-          <Wordmark />
+          <Wordmark inverse />
           <span className="admin-label">CONTROL ROOM</span>
         </div>
         <nav className="admin-nav" aria-label="Admin navigation">
