@@ -202,7 +202,6 @@ export function LeadForm({
             defaultValue="phone"
           >
             <option value="phone">Phone call</option>
-            <option value="text">Text message</option>
             <option value="email">Email</option>
           </select>
         </label>

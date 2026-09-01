@@ -348,7 +348,7 @@ function HomePage() {
               <div>
                 <span>02</span>
                 <strong>Human help</strong>
-                <p>Call, text, or send a note—no maze of forms.</p>
+                <p>Call or send a note—no maze of forms.</p>
               </div>
               <div>
                 <span>03</span>
@@ -915,7 +915,7 @@ function VehicleDetailPage() {
               >
                 <Icon name="phone" size={17} /> Call about this car
               </a>
-              {!sold && (
+              {!sold && settings.smsNumber.trim() && (
                 <a
                   className="button button--outline"
                   href={`sms:${settings.smsNumber.replace(/[^\d+]/g, "")}`}
@@ -1130,7 +1130,7 @@ function AboutPage() {
             <div>
               <span>02</span>
               <strong>Ask a real person</strong>
-              <p>Call, text, or send a note—whatever is easiest.</p>
+              <p>Call or send a note—whatever is easiest.</p>
             </div>
             <div>
               <span>03</span>
@@ -3098,12 +3098,6 @@ function AdminSettingsPage() {
                 value={settings.phone}
                 onChange={(event) => set("phone", event.target.value)}
                 required
-              />
-            </Field>
-            <Field label="SMS number">
-              <input
-                value={settings.smsNumber}
-                onChange={(event) => set("smsNumber", event.target.value)}
               />
             </Field>
             <Field label="Public email" required>

@@ -141,7 +141,7 @@ INSERT OR IGNORE INTO site_settings (
   'Your Choice Auto Group LLC',
   'YC Auto USA',
   '718-799-0606',
-  '718-799-0606',
+  '',
   'sophie@youxuancars.com',
   '167-04 Northern Blvd, Flushing, NY 11358',
   'Mon–Fri 10:00 AM–6:00 PM · Sat–Sun 12:00 PM–5:00 PM',

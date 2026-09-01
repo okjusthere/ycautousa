@@ -8,7 +8,7 @@ export const demoSettings: SiteSettings = {
   businessName: "Your Choice Auto Group LLC",
   shortName: "YC Auto USA",
   phone: "718-799-0606",
-  smsNumber: "718-799-0606",
+  smsNumber: "",
   email: "sophie@youxuancars.com",
   address: "167-04 Northern Blvd, Flushing, NY 11358",
   businessHours: "Mon–Fri 10:00 AM–6:00 PM · Sat–Sun 12:00 PM–5:00 PM",

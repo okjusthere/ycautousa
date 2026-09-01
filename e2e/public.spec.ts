@@ -93,6 +93,19 @@ test.describe("public showroom", () => {
     ).toBeVisible();
   });
 
+  test("keeps the business phone voice-only", async ({ page }) => {
+    await page.goto("/inventory/2022-toyota-rav4-xle-local");
+    await expect(
+      page.getByRole("link", { name: /Call about this car/i }),
+    ).toHaveAttribute("href", "tel:7187990606");
+    await expect(page.getByRole("link", { name: /Text us/i })).toHaveCount(0);
+
+    await page.goto("/contact");
+    await expect(
+      page.getByRole("option", { name: "Text message" }),
+    ).toHaveCount(0);
+  });
+
   test("legacy product paths redirect without losing the new listing", async ({
     request,
   }) => {

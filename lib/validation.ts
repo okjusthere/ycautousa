@@ -59,7 +59,7 @@ export const leadInputSchema = z
     name: z.string().trim().min(2).max(100),
     phone: z.string().trim().max(40).nullable().optional(),
     email: z.string().trim().email().max(254).nullable().optional(),
-    preferredContact: z.enum(["phone", "text", "email"]).default("phone"),
+    preferredContact: z.enum(["phone", "email"]).default("phone"),
     message: z.string().trim().max(3000).nullable().optional(),
     sourceUrl: z.string().url().max(2000).nullable().optional(),
     referrer: z.string().url().max(2000).nullable().optional(),

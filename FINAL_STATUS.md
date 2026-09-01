@@ -105,7 +105,7 @@ Immediately before DNS cutover, run a fresh `dry` + `prepare` delta pass, review
 1. Production Turnstile widget for `www.ycautousa.com` and its secret.
 2. Cloudflare Access application covering `www.ycautousa.com/admin*` and `www.ycautousa.com/api/admin*`, with only the exact administrator email(s) allowed; copy its team domain, AUD tag, and administrator email allowlist into the production Worker vars.
 3. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
-4. Final business phone/SMS/email confirmation in Website Settings. Address and hours are confirmed.
+4. Final business email confirmation in Website Settings. The business phone is confirmed as 718-799-0606 for voice calls only; SMS is intentionally disabled. Address and hours are confirmed.
 5. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records.
 
 No credentials were fabricated, committed, or printed by the implementation.
