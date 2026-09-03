@@ -279,6 +279,7 @@ describe("Worker API integration", () => {
     const previewEnv: Env = {
       ...env,
       APP_ORIGIN: "https://yc-auto-web.example.workers.dev",
+      CANONICAL_HOST: "yc-auto-web.example.workers.dev",
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
     };
     const response = await handleRequest(
@@ -303,6 +304,35 @@ describe("Worker API integration", () => {
       },
     );
     expect(response.status).toBe(200);
+  });
+
+  it("serves an https canonical hostname without redirecting to itself", async () => {
+    const productionEnv: Env = {
+      ...env,
+      APP_ORIGIN: "https://yc-auto-web.okjusthere.workers.dev",
+      CANONICAL_HOST: "yc-auto-web.okjusthere.workers.dev",
+    };
+    const response = await handleRequest(
+      new Request("https://yc-auto-web.okjusthere.workers.dev/sitemap.xml"),
+      productionEnv,
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("redirects a non-canonical hostname to the configured origin", async () => {
+    const productionEnv: Env = {
+      ...env,
+      APP_ORIGIN: "https://www.ycautousa.com",
+      CANONICAL_HOST: "www.ycautousa.com",
+    };
+    const response = await handleRequest(
+      new Request("https://ycautousa.com/inventory?make=Toyota"),
+      productionEnv,
+    );
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe(
+      "https://www.ycautousa.com/inventory?make=Toyota",
+    );
   });
 
   it("keeps sold records in the sitemap but excludes drafts", async () => {

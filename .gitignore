@@ -10,3 +10,4 @@ coverage
 migration/work
 *.local
 .gstack/
+.playwright-mcp/

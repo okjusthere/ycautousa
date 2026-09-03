@@ -1,6 +1,6 @@
 # YC Auto delivery status
 
-Updated: 2026-08-31
+Updated: 2026-09-02
 
 ## 1. Implemented
 
@@ -26,12 +26,12 @@ All code, local runtime, E2E, production-bundle, deployment, and live-site check
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 27 tests
-npm run test:e2e       PASS — 12 tests across Chromium + mobile
+npm run test           PASS — 9 files, 29 tests
+npm run test:e2e       PASS previously — 14 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
-npm audit (prod)       PASS previously — 0 vulnerabilities; current rerun was blocked by the environment's untrusted npm registry TLS certificate
+npm audit (prod)       PASS — 0 vulnerabilities
 npm run deploy         PASS — Worker and assets deployed to Cloudflare
-verify:prod            PASS — public pages, five vehicle pages, media, sitemap, robots, legacy 301, and protected admin
+verify:prod            PASS — public pages, five vehicle pages, sitemap, robots, and Cloudflare Access redirect
 ```
 
 `npm ci --ignore-scripts` was also run successfully from the lockfile before the final verification pass.
@@ -67,11 +67,14 @@ R2: yc-auto-vehicle-images
 Images binding: IMAGES
 Temporary URL: https://yc-auto-web.okjusthere.workers.dev
 Turnstile: production Managed widget for the temporary URL, apex, and www hostnames
+Access app: yc-auto-admin (temporary `/admin*` and `/api/admin*` paths)
+Access login: email one-time PIN; 24-hour session
+Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
-Current Worker version: 667b6dc8-a0af-46be-a80c-c567399faedd
+Current Worker version: ec897602-7e19-4304-b91d-402a731a0ed6
 ```
 
-The public site, inventory, images, redirects, lead persistence, and production Turnstile are live. The exact Worker allowlist contains `sophie@youxuancars.com` and `okjusthere@gmail.com`. The unauthenticated admin still returns 403 by design because the account has no Zero Trust organization or Access application yet. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Configure Access, Email Service, and the custom hostname during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
+The public site, inventory, images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
 
 ## 6. Exact commands to run
 
@@ -103,18 +106,18 @@ Immediately before DNS cutover, run a fresh `dry` + `prepare` delta pass, review
 
 ## 7. Credentials/dashboard actions still required
 
-1. Cloudflare Zero Trust organization and Access application covering the temporary hostname and, after DNS cutover, `www.ycautousa.com/admin*` and `www.ycautousa.com/api/admin*`; its policy must allow only the two configured administrator emails. Copy its team domain and AUD tag into the production Worker vars.
+1. Complete a real one-time-PIN login with each administrator account, then smoke-test VIN decode, vehicle create/edit, and R2 image upload from the live admin.
 2. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
 3. Move `ycautousa.com` from its current Wix nameservers into this Cloudflare account after exporting the existing zone.
 4. Final business email confirmation in Website Settings. The business phone is confirmed as 718-799-0606 for voice calls only; SMS is intentionally disabled. Address and hours are confirmed.
-5. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records.
+5. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records; add the production admin paths to the existing Access application and deploy the new canonical host/AUD if Cloudflare creates a separate Access application.
 
 No credentials were fabricated, committed, or printed by the implementation.
 
 ## 8. Known limitations
 
 - The production Managed Turnstile widget is configured for the temporary, apex, and www hostnames.
-- Admin authentication remains disabled until the Zero Trust organization and Access application are created and their team domain/AUD are deployed. Notification email remains disabled until Email Service is configured. Public lead submissions still persist in D1.
+- Cloudflare Access is active on the temporary hostname, but each administrator still needs to complete one real email-code login. Notification email remains disabled until Email Service is configured. Public lead submissions still persist in D1.
 - React Router v7.18.x is used because v8 is not currently published as a stable npm package.
 - Email Service still needs an authenticated smoke test after its sender and binding are attached. Live R2 media delivery already passed remote and HTTP checks.
 - The live legacy source contains one missing/invalid VIN (`2024 BMW X5`), retained as an audit-visible editable field.
@@ -128,8 +131,10 @@ No credentials were fabricated, committed, or printed by the implementation.
 - [x] Set deployment secrets without committing them.
 - [x] Apply D1 migrations and full legacy migration; review and remotely verify counts/media.
 - [x] Deploy the workers.dev preview and verify public pages, inventory, legacy redirects, media, lead persistence, and admin denial.
-- [ ] Create the Zero Trust organization and Access application; deploy its AUD/team domain and test both administrator accounts, VIN decode, and uploads. The exact Worker email allowlist is already deployed.
+- [x] Create the Zero Trust Access application, deploy its AUD/team domain, and verify the login redirect and exact two-email policy.
+- [ ] Complete a real OTP login for both administrator accounts, then test VIN decode and image upload in the live admin.
 - [ ] Configure Email Service and test a real lead notification email.
 - [ ] Export/preserve DNS and mail records; bind `www`, configure apex 301, and do not break MX/SPF/DKIM/DMARC.
-- [ ] Deploy production with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, media, old URL 301s, and a real lead.
+- [x] Deploy the workers.dev production preview with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, and Access redirect.
+- [ ] After custom-domain cutover, verify media, old URL 301s, and one real lead end-to-end.
 - [ ] Keep the old host read-only for seven days, monitor Worker/Email logs, and retain the rollback version and D1 bookmark.

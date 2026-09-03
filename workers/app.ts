@@ -908,11 +908,11 @@ export async function handleRequest(
   try {
     const url = new URL(request.url);
     const host = request.headers.get("Host") ?? url.host;
+    const requestHost = host.split(":")[0].toLowerCase();
+    const canonicalHost = env.CANONICAL_HOST?.trim().toLowerCase();
     if (
-      env.CANONICAL_HOST &&
-      (host.split(":")[0].toLowerCase() ===
-        env.CANONICAL_HOST.replace(/^www\./i, "") ||
-        url.protocol === "http:") &&
+      canonicalHost &&
+      (requestHost !== canonicalHost || url.protocol === "http:") &&
       /^https:/i.test(env.APP_ORIGIN ?? "")
     )
       return withSecurity(
