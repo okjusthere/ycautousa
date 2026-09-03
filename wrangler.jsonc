@@ -45,8 +45,8 @@
       "vars": {
         "APP_ORIGIN": "https://yc-auto-web.okjusthere.workers.dev",
         "CANONICAL_HOST": "",
-        "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
-        "ADMIN_EMAILS": "",
+        "TURNSTILE_SITE_KEY": "0x4AAAAAAElaAngmbPBisynr",
+        "ADMIN_EMAILS": "sophie@youxuancars.com,okjusthere@gmail.com",
         "ACCESS_TEAM_DOMAIN": "",
         "ACCESS_AUD_TAG": "",
         "EMAIL_FROM": "",

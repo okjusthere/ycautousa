@@ -66,11 +66,12 @@ D1: yc-auto-prod (7d5c884b-3f9d-4b8c-9c9b-b3c0f6bd1356)
 R2: yc-auto-vehicle-images
 Images binding: IMAGES
 Temporary URL: https://yc-auto-web.okjusthere.workers.dev
-Turnstile: official always-pass test widget/secret for the temporary URL
+Turnstile: production Managed widget for the temporary URL, apex, and www hostnames
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
+Current Worker version: 667b6dc8-a0af-46be-a80c-c567399faedd
 ```
 
-The public site, inventory, images, redirects, and lead persistence are live. The unauthenticated admin returns 403 by design because the temporary hostname has no Access application or administrator allowlist. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Configure a real Turnstile widget, Access policy, Email Service sender, and custom hostname during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
+The public site, inventory, images, redirects, lead persistence, and production Turnstile are live. The exact Worker allowlist contains `sophie@youxuancars.com` and `okjusthere@gmail.com`. The unauthenticated admin still returns 403 by design because the account has no Zero Trust organization or Access application yet. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Configure Access, Email Service, and the custom hostname during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
 
 ## 6. Exact commands to run
 
@@ -102,9 +103,9 @@ Immediately before DNS cutover, run a fresh `dry` + `prepare` delta pass, review
 
 ## 7. Credentials/dashboard actions still required
 
-1. Production Turnstile widget for `www.ycautousa.com` and its secret.
-2. Cloudflare Access application covering `www.ycautousa.com/admin*` and `www.ycautousa.com/api/admin*`, with only the exact administrator email(s) allowed; copy its team domain, AUD tag, and administrator email allowlist into the production Worker vars.
-3. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
+1. Cloudflare Zero Trust organization and Access application covering the temporary hostname and, after DNS cutover, `www.ycautousa.com/admin*` and `www.ycautousa.com/api/admin*`; its policy must allow only the two configured administrator emails. Copy its team domain and AUD tag into the production Worker vars.
+2. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
+3. Move `ycautousa.com` from its current Wix nameservers into this Cloudflare account after exporting the existing zone.
 4. Final business email confirmation in Website Settings. The business phone is confirmed as 718-799-0606 for voice calls only; SMS is intentionally disabled. Address and hours are confirmed.
 5. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records.
 
@@ -112,8 +113,8 @@ No credentials were fabricated, committed, or printed by the implementation.
 
 ## 8. Known limitations
 
-- The temporary site intentionally uses Cloudflare's test Turnstile key. Replace it before directing real customer traffic to the custom domain.
-- Admin access and notification email are intentionally disabled until Access and Email Service are configured for the custom domain. Public lead submissions still persist in D1.
+- The production Managed Turnstile widget is configured for the temporary, apex, and www hostnames.
+- Admin authentication remains disabled until the Zero Trust organization and Access application are created and their team domain/AUD are deployed. Notification email remains disabled until Email Service is configured. Public lead submissions still persist in D1.
 - React Router v7.18.x is used because v8 is not currently published as a stable npm package.
 - Email Service still needs an authenticated smoke test after its sender and binding are attached. Live R2 media delivery already passed remote and HTTP checks.
 - The live legacy source contains one missing/invalid VIN (`2024 BMW X5`), retained as an audit-visible editable field.
@@ -123,11 +124,12 @@ No credentials were fabricated, committed, or printed by the implementation.
 ## 9. Concise production launch checklist
 
 - [x] Replace deployment blockers and run `npm run preflight:deploy`.
-- [x] Create/confirm D1, R2, Images binding, and temporary Turnstile configuration.
+- [x] Create/confirm D1, R2, Images binding, and production Turnstile configuration.
 - [x] Set deployment secrets without committing them.
 - [x] Apply D1 migrations and full legacy migration; review and remotely verify counts/media.
 - [x] Deploy the workers.dev preview and verify public pages, inventory, legacy redirects, media, lead persistence, and admin denial.
-- [ ] Configure custom-domain Turnstile, Access email allowlist/AUD/team domain, and Email Service; test authenticated admin, VIN decode, uploads, and notification email.
+- [ ] Create the Zero Trust organization and Access application; deploy its AUD/team domain and test both administrator accounts, VIN decode, and uploads. The exact Worker email allowlist is already deployed.
+- [ ] Configure Email Service and test a real lead notification email.
 - [ ] Export/preserve DNS and mail records; bind `www`, configure apex 301, and do not break MX/SPF/DKIM/DMARC.
 - [ ] Deploy production with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, media, old URL 301s, and a real lead.
 - [ ] Keep the old host read-only for seven days, monitor Worker/Email logs, and retain the rollback version and D1 bookmark.
