@@ -173,9 +173,7 @@ async function uniqueVehicleSlug(
   excludeId?: string,
 ): Promise<string> {
   const existing = await db
-    .prepare(
-      "SELECT id FROM vehicles WHERE slug = ? AND deleted_at IS NULL LIMIT 1",
-    )
+    .prepare("SELECT id FROM vehicles WHERE slug = ? LIMIT 1")
     .bind(base)
     .first<{ id: string }>();
   if (!existing || existing.id === excludeId) return base;
@@ -368,8 +366,17 @@ async function adminApi(
   if (mutation) {
     const rejected = ensureMutation(request, env);
     if (rejected) return rejected;
-    if (!bodyWithinLimit(request, 64 * 1024))
-      return errorResponse("Request is too large", 413);
+    const isVehicleImageUpload =
+      request.method === "POST" &&
+      /^\/api\/admin\/vehicles\/[^/]+\/images$/.test(path);
+    const mutationLimit = isVehicleImageUpload ? 15 * 1024 * 1024 : 64 * 1024;
+    if (!bodyWithinLimit(request, mutationLimit))
+      return errorResponse(
+        isVehicleImageUpload
+          ? "Image upload is too large"
+          : "Request is too large",
+        413,
+      );
   }
 
   if (path === "/api/admin/dashboard" && request.method === "GET") {

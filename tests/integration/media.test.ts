@@ -10,6 +10,9 @@ const pngBytes = Uint8Array.from(
   (character) => character.charCodeAt(0),
 );
 
+const realisticPngBytes = new Uint8Array(70 * 1024);
+realisticPngBytes.set(pngBytes);
+
 describe("R2 media integration", () => {
   it("uploads, serves, reorders, and soft-deletes an image without destroying the object", async () => {
     const objects = new Map<
@@ -80,7 +83,7 @@ describe("R2 media integration", () => {
     const form = new FormData();
     form.append(
       "file",
-      new File([pngBytes], "front.png", { type: "image/png" }),
+      new File([realisticPngBytes], "front.png", { type: "image/png" }),
     );
     const upload = await handleRequest(
       new Request(
@@ -90,6 +93,7 @@ describe("R2 media integration", () => {
           headers: {
             "CF-Access-Authenticated-User-Email": "admin@example.com",
             Origin: "http://localhost:5173",
+            "Content-Length": String(realisticPngBytes.byteLength + 512),
           },
           body: form,
         },

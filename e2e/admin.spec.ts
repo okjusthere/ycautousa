@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+const pngBytes = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 test.describe("admin workspace", () => {
   test("adds, categorizes, and removes a vehicle", async ({ page }) => {
     await page.goto("/admin");
@@ -48,5 +53,39 @@ test.describe("admin workspace", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: /Open admin navigation/i }).click();
     await expect(page.getByRole("link", { name: /Leads/i })).toBeVisible();
+  });
+
+  test("first photo creates a draft automatically and uploads a realistic file", async ({
+    page,
+  }) => {
+    await page.goto("/admin/vehicles/new");
+    await page.getByLabel(/Listing title/).fill("Photo Upload Test Vehicle");
+    await expect(
+      page.getByText(/first upload will create a private draft automatically/i),
+    ).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Draft/i })).toBeChecked();
+    await expect(
+      page.getByRole("button", { name: /Publish listing/i }).last(),
+    ).toBeVisible();
+
+    const realisticImage = Buffer.alloc(70 * 1024);
+    pngBytes.copy(realisticImage);
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "front.png",
+      mimeType: "image/png",
+      buffer: realisticImage,
+    });
+
+    await expect(page).toHaveURL(/\/admin\/vehicles\/(?!new)[^/]+$/);
+    await expect(
+      page.getByText(/1 photo uploaded successfully/i),
+    ).toBeVisible();
+    await expect(
+      page.getByAltText(/Photo Upload Test Vehicle view 1/i),
+    ).toBeVisible();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Remove vehicle" }).click();
+    await expect(page).toHaveURL(/\/admin\/vehicles$/);
   });
 });

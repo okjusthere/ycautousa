@@ -1949,6 +1949,50 @@ type EditorState = {
   features: string;
   images: VehicleImage[];
 };
+
+type FailedUpload = {
+  file: File;
+  reason: string;
+};
+
+const PUBLISHING_OPTIONS: Array<{
+  value: VehicleStatus;
+  label: string;
+  description: string;
+  isPublic: boolean;
+}> = [
+  {
+    value: "draft",
+    label: "Draft",
+    description: "Private to admins while you finish the listing.",
+    isPublic: false,
+  },
+  {
+    value: "available",
+    label: "Available",
+    description: "Live in inventory and ready for customer inquiries.",
+    isPublic: true,
+  },
+  {
+    value: "pending",
+    label: "Pending",
+    description: "Still visible, marked as pending for shoppers.",
+    isPublic: true,
+  },
+  {
+    value: "sold",
+    label: "Sold",
+    description: "Still visible as sold so existing links keep working.",
+    isPublic: true,
+  },
+  {
+    value: "hidden",
+    label: "Hidden",
+    description: "Removed from the public site without deleting it.",
+    isPublic: false,
+  },
+];
+
 const blankEditor: EditorState = {
   status: "draft",
   featured: false,
@@ -2063,9 +2107,10 @@ function AdminVehicleEditorPage() {
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [photoError, setPhotoError] = useState("");
   const [decoding, setDecoding] = useState(false);
   const [uploading, setUploading] = useState(0);
-  const [failedUploads, setFailedUploads] = useState<File[]>([]);
+  const [failedUploads, setFailedUploads] = useState<FailedUpload[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   usePageMeta(
     `${isNew ? "Add vehicle" : "Edit vehicle"} | YC Auto USA`,
@@ -2087,6 +2132,12 @@ function AdminVehicleEditorPage() {
   }, [id, isNew]);
   const set = (key: keyof EditorState, value: unknown) =>
     setState((old) => ({ ...old, [key]: value }));
+  const setPublishingStatus = (status: VehicleStatus) =>
+    setState((old) => ({
+      ...old,
+      status,
+      featured: status === "available" ? old.featured : false,
+    }));
   async function decode() {
     if (!state.vin || state.vin.length !== 17) {
       setError("Enter a valid 17-character VIN first.");
@@ -2131,17 +2182,10 @@ function AdminVehicleEditorPage() {
       setDecoding(false);
     }
   }
-  async function save(event: FormEvent, publish = false) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    setMessage("");
-    const payload = {
-      status:
-        publish && (isNew || state.status === "draft")
-          ? "available"
-          : state.status,
-      featured: state.featured,
+  function vehiclePayload(status: VehicleStatus = state.status) {
+    return {
+      status,
+      featured: status === "available" ? state.featured : false,
       title: state.title,
       year: state.year || null,
       make: state.make || null,
@@ -2166,9 +2210,30 @@ function AdminVehicleEditorPage() {
         .map((value) => value.trim())
         .filter(Boolean),
     };
+  }
+  async function save(event: FormEvent, statusOverride?: VehicleStatus) {
+    event.preventDefault();
+    const targetStatus = statusOverride ?? state.status;
+    setSaving(true);
+    setError("");
+    setMessage("");
     try {
-      const result = await saveVehicle(payload, isNew ? undefined : id);
-      setMessage(publish ? "Vehicle published." : "Draft saved.");
+      const result = await saveVehicle(
+        vehiclePayload(targetStatus),
+        isNew ? undefined : id,
+      );
+      setState((old) => ({
+        ...old,
+        status: targetStatus,
+        featured: targetStatus === "available" ? old.featured : false,
+      }));
+      setMessage(
+        targetStatus === "draft"
+          ? "Draft saved."
+          : targetStatus === "available"
+            ? "Listing is live and available."
+            : `Listing saved as ${targetStatus}.`,
+      );
       if (result.vehicle?.slug) setPreviewSlug(result.vehicle.slug);
       if (isNew && result.id)
         navigate(`/admin/vehicles/${result.id}`, { replace: true });
@@ -2176,6 +2241,25 @@ function AdminVehicleEditorPage() {
       setError(
         reason instanceof Error ? reason.message : "Unable to save vehicle.",
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function ensureVehicleForUpload(): Promise<{
+    vehicleId: string;
+    created: boolean;
+  }> {
+    if (!isNew && id) return { vehicleId: id, created: false };
+    if (!state.title.trim())
+      throw new Error("Add a listing title before uploading photos.");
+    setSaving(true);
+    try {
+      const result = await saveVehicle(vehiclePayload("draft"));
+      if (!result.id) throw new Error("Unable to create the vehicle draft.");
+      setState((old) => ({ ...old, status: "draft", featured: false }));
+      setMessage("Private draft created. Uploading photos…");
+      return { vehicleId: result.id, created: true };
     } finally {
       setSaving(false);
     }
@@ -2200,43 +2284,82 @@ function AdminVehicleEditorPage() {
       setDeleting(false);
     }
   }
-  async function uploadOne(file: File): Promise<void> {
-    if (!id || isNew) return;
+  async function uploadOne(file: File, vehicleId: string): Promise<void> {
+    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type))
+      throw new Error("Use a JPEG, PNG, or WebP image.");
     const prepared = await resizeImageForUpload(file);
+    if (prepared.size > 12 * 1024 * 1024)
+      throw new Error("The resized image is still over the 12 MB limit.");
     const form = new FormData();
     form.append("file", prepared);
-    const response = await fetch(`/api/admin/vehicles/${id}/images`, {
+    const response = await fetch(`/api/admin/vehicles/${vehicleId}/images`, {
       method: "POST",
       body: form,
     });
+    const contentType = response.headers.get("content-type") ?? "";
+    if (response.redirected || !contentType.includes("application/json"))
+      throw new Error(
+        response.status === 413
+          ? "The uploaded image is too large."
+          : "Your admin session may have expired. Refresh and sign in again.",
+      );
     const result = (await response.json()) as {
       error?: string;
       image?: VehicleImage;
     };
     if (!response.ok) throw new Error(result.error || "Image upload failed.");
-    if (result.image)
-      setState((old) => ({
-        ...old,
-        images: [...old.images, result.image as VehicleImage],
-      }));
+    if (!result.image) throw new Error("The upload finished without an image.");
+    setState((old) => ({
+      ...old,
+      images: [...old.images, result.image as VehicleImage],
+    }));
   }
   async function uploadFiles(files: File[]) {
-    if (!files.length || !id || isNew) return;
-    const failures: File[] = [];
-    setUploading(0);
+    if (!files.length) return;
+    const failures: FailedUpload[] = [];
+    setError("");
+    setPhotoError("");
+    setFailedUploads([]);
+    setUploading(1);
+    let target: { vehicleId: string; created: boolean };
+    try {
+      target = await ensureVehicleForUpload();
+    } catch (reason) {
+      const detail =
+        reason instanceof Error
+          ? reason.message
+          : "Unable to prepare this listing for photos.";
+      setPhotoError(detail);
+      setError(detail);
+      setUploading(0);
+      return;
+    }
     for (let index = 0; index < files.length; index += 1) {
       try {
-        await uploadOne(files[index]);
+        await uploadOne(files[index], target.vehicleId);
       } catch (reason) {
-        failures.push(files[index]);
-        setError(
-          reason instanceof Error ? reason.message : "Image upload failed.",
-        );
+        failures.push({
+          file: files[index],
+          reason:
+            reason instanceof Error ? reason.message : "Image upload failed.",
+        });
       } finally {
         setUploading(Math.round(((index + 1) / files.length) * 100));
       }
     }
     setFailedUploads(failures);
+    if (failures.length) {
+      setPhotoError(
+        `${failures.length} photo${failures.length === 1 ? "" : "s"} could not be uploaded. See the reason below.`,
+      );
+    } else {
+      setPhotoError("");
+      setMessage(
+        `${files.length} photo${files.length === 1 ? "" : "s"} uploaded successfully.`,
+      );
+    }
+    if (target.created)
+      navigate(`/admin/vehicles/${target.vehicleId}`, { replace: true });
   }
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     await uploadFiles(event.target.files ? Array.from(event.target.files) : []);
@@ -2246,14 +2369,22 @@ function AdminVehicleEditorPage() {
     event.preventDefault();
     await uploadFiles(Array.from(event.dataTransfer.files));
   }
-  async function retryUpload(file: File) {
+  async function retryUpload(failure: FailedUpload) {
+    if (!id || isNew) return;
     try {
-      await uploadOne(file);
-      setFailedUploads((old) => old.filter((item) => item !== file));
+      await uploadOne(failure.file, id);
+      const remaining = failedUploads.filter((item) => item !== failure);
+      setFailedUploads(remaining);
+      if (!remaining.length) setPhotoError("");
       setError("");
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Image upload failed.",
+      const detail =
+        reason instanceof Error ? reason.message : "Image upload failed.";
+      setPhotoError(detail);
+      setFailedUploads((old) =>
+        old.map((item) =>
+          item === failure ? { ...item, reason: detail } : item,
+        ),
       );
     }
   }
@@ -2345,16 +2476,22 @@ function AdminVehicleEditorPage() {
           <button
             className="button button--dark"
             disabled={saving}
-            onClick={(event) => save(event, false)}
+            onClick={(event) => save(event, "draft")}
           >
             Save draft
           </button>
           <button
             className="button button--red"
             disabled={saving}
-            onClick={(event) => save(event, true)}
+            onClick={(event) =>
+              save(event, state.status === "draft" ? "available" : undefined)
+            }
           >
-            {saving ? "Saving…" : isNew ? "Publish" : "Update"}{" "}
+            {saving
+              ? "Saving…"
+              : state.status === "draft"
+                ? "Publish listing"
+                : "Save changes"}{" "}
             <Icon name="arrow" size={16} />
           </button>
         </div>
@@ -2372,7 +2509,7 @@ function AdminVehicleEditorPage() {
           {error}
         </div>
       )}
-      <form className="editor-form" onSubmit={(event) => save(event, false)}>
+      <form className="editor-form" onSubmit={(event) => save(event)}>
         <section className="form-section">
           <div className="form-section-heading">
             <span>01</span>
@@ -2478,7 +2615,7 @@ function AdminVehicleEditorPage() {
               <p>Keep the numbers clear and current.</p>
             </div>
           </div>
-          <div className="editor-fields editor-fields--three">
+          <div className="editor-fields editor-fields--two-equal">
             <Field label="Price">
               <div className="prefix-input">
                 <span>$</span>
@@ -2502,20 +2639,6 @@ function AdminVehicleEditorPage() {
                 />
                 <span>mi</span>
               </div>
-            </Field>
-            <Field label="Status">
-              <select
-                value={state.status}
-                onChange={(event) =>
-                  set("status", event.target.value as VehicleStatus)
-                }
-              >
-                <option value="draft">Draft</option>
-                <option value="available">Available</option>
-                <option value="pending">Pending</option>
-                <option value="sold">Sold</option>
-                <option value="hidden">Hidden</option>
-              </select>
             </Field>
           </div>
         </section>
@@ -2614,121 +2737,122 @@ function AdminVehicleEditorPage() {
               </p>
             </div>
           </div>
-          {isNew ? (
-            <div className="upload-locked">
-              <Icon name="upload" size={24} />
-              <p>Save this vehicle as a draft first, then add photos.</p>
+          <label
+            className="upload-drop"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={dropFiles}
+          >
+            <Icon name="upload" size={24} />
+            <strong>Drop photos here or choose files</strong>
+            <span>
+              {uploading > 0 && uploading < 100
+                ? `Uploading ${uploading}%…`
+                : isNew
+                  ? "Your first upload will create a private draft automatically."
+                  : "We’ll resize and upload them one at a time."}
+            </span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              disabled={saving || (uploading > 0 && uploading < 100)}
+              onChange={upload}
+            />
+          </label>
+          {photoError && (
+            <p className="upload-inline-error" role="alert">
+              {photoError}
+            </p>
+          )}
+          {failedUploads.length > 0 && (
+            <div className="upload-retry-list" role="status">
+              <strong>
+                {failedUploads.length} photo
+                {failedUploads.length === 1 ? "" : "s"} need attention
+              </strong>
+              {failedUploads.map((failure) => (
+                <div
+                  className="upload-retry-item"
+                  key={`${failure.file.name}-${failure.file.lastModified}`}
+                >
+                  <span>
+                    {failure.file.name}: {failure.reason}
+                  </span>
+                  <button type="button" onClick={() => retryUpload(failure)}>
+                    Retry <Icon name="arrow" size={14} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : (
-            <>
-              <label
-                className="upload-drop"
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={dropFiles}
-              >
-                <Icon name="upload" size={24} />
-                <strong>Drop photos here or choose files</strong>
-                <span>
-                  {uploading > 0 && uploading < 100
-                    ? `Uploading ${uploading}%…`
-                    : "We’ll resize and upload them one at a time."}
-                </span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  onChange={upload}
-                />
-              </label>
-              {failedUploads.length > 0 && (
-                <div className="upload-retry-list" role="status">
-                  <strong>
-                    {failedUploads.length} photo
-                    {failedUploads.length === 1 ? "" : "s"} need attention
-                  </strong>
-                  {failedUploads.map((file) => (
+          )}
+          {state.images.length > 0 && (
+            <div className="image-manager">
+              {state.images.map((image, index) => (
+                <div
+                  className={`image-manager-item ${image.isCover ? "is-cover" : ""}`}
+                  key={image.id}
+                  draggable
+                  onDragStart={() => setDragIndex(index)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => dropImage(index)}
+                >
+                  <img
+                    src={
+                      image.r2Key
+                        ? `/media/${image.r2Key}?w=320&format=webp`
+                        : "/vehicle-placeholder.svg"
+                    }
+                    alt={`${state.title} view ${index + 1}`}
+                    width="160"
+                    height="108"
+                  />
+                  <span className="drag-handle">
+                    <Icon name="grip" size={17} />
+                  </span>
+                  <div className="image-manager-meta">
+                    <strong>
+                      {image.isCover ? "Cover image" : `Photo ${index + 1}`}
+                    </strong>
+                    <small>{image.originalFilename ?? "Uploaded image"}</small>
+                  </div>
+                  <div className="image-manager-actions">
                     <button
                       type="button"
-                      key={`${file.name}-${file.lastModified}`}
-                      onClick={() => retryUpload(file)}
+                      onClick={() => setCover(image)}
+                      disabled={image.isCover}
                     >
-                      Retry {file.name} <Icon name="arrow" size={14} />
+                      {image.isCover ? "Cover" : "Set cover"}
                     </button>
-                  ))}
-                </div>
-              )}
-              {state.images.length > 0 && (
-                <div className="image-manager">
-                  {state.images.map((image, index) => (
-                    <div
-                      className={`image-manager-item ${image.isCover ? "is-cover" : ""}`}
-                      key={image.id}
-                      draggable
-                      onDragStart={() => setDragIndex(index)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => dropImage(index)}
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => reorder(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move image up"
                     >
-                      <img
-                        src={
-                          image.r2Key
-                            ? `/media/${image.r2Key}?w=320&format=webp`
-                            : "/vehicle-placeholder.svg"
-                        }
-                        alt={`${state.title} view ${index + 1}`}
-                        width="160"
-                        height="108"
-                      />
-                      <span className="drag-handle">
-                        <Icon name="grip" size={17} />
-                      </span>
-                      <div className="image-manager-meta">
-                        <strong>
-                          {image.isCover ? "Cover image" : `Photo ${index + 1}`}
-                        </strong>
-                        <small>
-                          {image.originalFilename ?? "Uploaded image"}
-                        </small>
-                      </div>
-                      <div className="image-manager-actions">
-                        <button
-                          type="button"
-                          onClick={() => setCover(image)}
-                          disabled={image.isCover}
-                        >
-                          {image.isCover ? "Cover" : "Set cover"}
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button"
-                          onClick={() => reorder(index, -1)}
-                          disabled={index === 0}
-                          aria-label="Move image up"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button"
-                          onClick={() => reorder(index, 1)}
-                          disabled={index === state.images.length - 1}
-                          aria-label="Move image down"
-                        >
-                          ↓
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button danger"
-                          onClick={() => removeImage(image)}
-                          aria-label="Remove image"
-                        >
-                          <Icon name="trash" size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => reorder(index, 1)}
+                      disabled={index === state.images.length - 1}
+                      aria-label="Move image down"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button danger"
+                      onClick={() => removeImage(image)}
+                      aria-label="Remove image"
+                    >
+                      <Icon name="trash" size={16} />
+                    </button>
+                  </div>
                 </div>
-              )}
-            </>
+              ))}
+            </div>
           )}
         </section>
         <section className="form-section form-section--publish">
@@ -2739,18 +2863,88 @@ function AdminVehicleEditorPage() {
               <p>Choose where this listing appears.</p>
             </div>
           </div>
-          <label className="toggle-row">
+          <fieldset className="publishing-statuses">
+            <legend>Listing status</legend>
+            {PUBLISHING_OPTIONS.map((option) => (
+              <label
+                className={`publishing-status ${state.status === option.value ? "is-selected" : ""}`}
+                key={option.value}
+              >
+                <input
+                  type="radio"
+                  name="vehicle-status"
+                  value={option.value}
+                  checked={state.status === option.value}
+                  onChange={() => setPublishingStatus(option.value)}
+                />
+                <span className="publishing-status-dot" />
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+                <em>{option.isPublic ? "Public" : "Private"}</em>
+              </label>
+            ))}
+          </fieldset>
+          <label
+            className={`toggle-row ${state.status !== "available" ? "is-disabled" : ""}`}
+          >
             <input
               type="checkbox"
               checked={state.featured}
+              disabled={state.status !== "available"}
               onChange={(event) => set("featured", event.target.checked)}
             />
             <span className="toggle" />
             <span>
               <strong>Feature on home page</strong>
-              <small>Place this vehicle in the featured selection.</small>
+              <small>
+                {state.status === "available"
+                  ? "Place this vehicle in the featured selection."
+                  : "Set the listing to Available before featuring it."}
+              </small>
             </span>
           </label>
+          <div className="publishing-actions">
+            <div>
+              <span>Selected status</span>
+              <strong>
+                {
+                  PUBLISHING_OPTIONS.find(
+                    (option) => option.value === state.status,
+                  )?.label
+                }
+              </strong>
+            </div>
+            <div>
+              <button
+                type="button"
+                className="button button--dark"
+                disabled={saving}
+                onClick={(event) => save(event, "draft")}
+              >
+                Save as draft
+              </button>
+              <button
+                type="button"
+                className="button button--red"
+                disabled={saving}
+                onClick={(event) =>
+                  save(
+                    event,
+                    state.status === "draft" ? "available" : undefined,
+                  )
+                }
+              >
+                {saving
+                  ? "Saving…"
+                  : state.status === "draft"
+                    ? "Publish listing"
+                    : "Save changes"}
+                <Icon name="arrow" size={16} />
+              </button>
+            </div>
+          </div>
         </section>
         {!isNew && (
           <section className="form-section form-section--danger">

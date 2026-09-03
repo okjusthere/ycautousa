@@ -113,6 +113,21 @@ describe("Worker API integration", () => {
     expect(
       ((await adminInventory.json()) as { vehicles: Vehicle[] }).vehicles,
     ).not.toEqual(expect.arrayContaining([expect.objectContaining({ id })]));
+
+    const recreate = await handleRequest(
+      new Request("http://localhost:5173/api/admin/vehicles", {
+        method: "POST",
+        headers: adminHeaders,
+        body: JSON.stringify({
+          title: "2026 Inventory Removal Test",
+          status: "draft",
+          featured: false,
+          features: [],
+        }),
+      }),
+      env,
+    );
+    expect(recreate.status).toBe(201);
   });
 
   it("keeps sold pages public and persists leads before email failures", async () => {
