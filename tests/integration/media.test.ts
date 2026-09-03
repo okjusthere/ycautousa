@@ -123,5 +123,35 @@ describe("R2 media integration", () => {
     );
     expect(deleted.status).toBe(200);
     expect(objects.has(image.r2Key)).toBe(true);
+
+    env.VEHICLE_IMAGES = {
+      ...bucket,
+      put: async () => {
+        throw new Error("private storage detail");
+      },
+    };
+    const failedForm = new FormData();
+    failedForm.append(
+      "file",
+      new File([pngBytes], "retry.png", { type: "image/png" }),
+    );
+    const failedUpload = await handleRequest(
+      new Request(
+        `http://localhost:5173/api/admin/vehicles/${vehicleId}/images`,
+        {
+          method: "POST",
+          headers: {
+            "CF-Access-Authenticated-User-Email": "admin@example.com",
+            Origin: "http://localhost:5173",
+          },
+          body: failedForm,
+        },
+      ),
+      env,
+    );
+    expect(failedUpload.status).toBe(500);
+    expect(await failedUpload.json()).toEqual({
+      error: "Unable to upload image.",
+    });
   });
 });

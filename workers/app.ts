@@ -60,7 +60,7 @@ import {
   rateLimitKey,
 } from "./security";
 import { sendLeadNotification } from "./email";
-import { serveMedia, uploadVehicleImage } from "./media";
+import { MediaUploadError, serveMedia, uploadVehicleImage } from "./media";
 import { verifyTurnstile } from "./turnstile";
 import { assertVehicleTransition } from "../lib/status";
 
@@ -584,8 +584,10 @@ async function adminApi(
         );
       } catch (error) {
         return errorResponse(
-          error instanceof Error ? error.message : "Unable to upload image.",
-          400,
+          error instanceof MediaUploadError
+            ? error.message
+            : "Unable to upload image.",
+          error instanceof MediaUploadError ? 400 : 500,
         );
       }
     }

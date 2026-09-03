@@ -13,6 +13,10 @@ const OUTPUT_MIME: Record<"webp" | "avif" | "jpeg", ImageOutputMime> = {
   jpeg: "image/jpeg",
 };
 
+export class MediaUploadError extends Error {
+  override name = "MediaUploadError";
+}
+
 function safeFilename(value: string): string {
   return (
     value.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120) || "vehicle-image"
@@ -103,15 +107,15 @@ export async function validateImageBytes(
   height: number | null;
 }> {
   if (bytes.byteLength <= 0 || bytes.byteLength > MAX_IMAGE_BYTES)
-    throw new Error("Image exceeds the 12 MB limit");
+    throw new MediaUploadError("Image exceeds the 12 MB limit");
   const detected = detectImage(new Uint8Array(bytes), declaredType);
   if (!detected)
-    throw new Error("File is not a valid JPEG, PNG, or WebP image");
+    throw new MediaUploadError("File is not a valid JPEG, PNG, or WebP image");
   if (
     (detected.width && detected.width > 12_000) ||
     (detected.height && detected.height > 12_000)
   )
-    throw new Error("Image dimensions are too large");
+    throw new MediaUploadError("Image dimensions are too large");
   return detected;
 }
 
@@ -127,7 +131,8 @@ export async function uploadVehicleImage(
   if (!env.VEHICLE_IMAGES)
     throw new Error("Vehicle image storage is not configured");
   const file = form.get("file");
-  if (!(file instanceof File)) throw new Error("Choose an image file");
+  if (!(file instanceof File))
+    throw new MediaUploadError("Choose an image file");
   const bytes = await file.arrayBuffer();
   const declaredType = file.type || "application/octet-stream";
   const detected = await validateImageBytes(bytes, declaredType);
