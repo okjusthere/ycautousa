@@ -12,8 +12,16 @@ test.describe("public showroom", () => {
         ),
       )
       .toBe(true);
+    if (await page.getByRole("button", { name: "Open menu" }).isVisible())
+      await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(
+      page
+        .locator(".site-header")
+        .getByRole("link", { name: "Our Staff", exact: true }),
+    ).toBeVisible();
 
     await page.goto("/about");
+    await expect(page.getByText("Our Staff / YC Auto USA")).toBeVisible();
     const team = page.locator(".about-team-photo img");
     await expect(team).toBeVisible();
     await expect

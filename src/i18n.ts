@@ -8,7 +8,7 @@ export const messages = {
     nav: {
       inventory: "Inventory",
       trade: "Trade/Sell",
-      story: "Our story",
+      story: "Our Staff",
       contact: "Contact",
       call: "Call us",
       menu: "Open menu",
@@ -171,10 +171,10 @@ export const messages = {
       },
     },
     about: {
-      metaTitle: "Our story | YC Auto USA",
+      metaTitle: "Our Staff | YC Auto USA",
       metaDescription:
         "Meet YC Auto USA, a local pre-owned vehicle dealer in Flushing, New York.",
-      eyebrow: "Our story / YC Auto USA",
+      eyebrow: "Our Staff / YC Auto USA",
       title: "Local knowledge.",
       accent: "Good cars.",
       lede: "A straightforward place to find your next vehicle in Flushing, New York.",
@@ -303,7 +303,7 @@ export const messages = {
     nav: {
       inventory: "在售车辆",
       trade: "置换/卖车",
-      story: "关于我们",
+      story: "我们的团队",
       contact: "联系我们",
       call: "致电咨询",
       menu: "打开菜单",
@@ -459,9 +459,9 @@ export const messages = {
       },
     },
     about: {
-      metaTitle: "关于我们｜YC Auto USA",
-      metaDescription: "了解位于纽约法拉盛的本地二手车行 YC Auto USA。",
-      eyebrow: "关于我们 / YC Auto USA",
+      metaTitle: "我们的团队｜YC Auto USA",
+      metaDescription: "认识位于纽约法拉盛的 YC Auto USA 本地团队。",
+      eyebrow: "我们的团队 / YC Auto USA",
       title: "熟悉本地。",
       accent: "认真选车。",
       lede: "在纽约法拉盛，用简单透明的方式找到下一辆车。",

@@ -881,9 +881,9 @@ async function decoratePublicHtml(
       ? "提交 VIN、里程和联系方式，开始车辆置换或出售咨询。"
       : "Share your VIN, mileage, and contact details to start a Trade/Sell request.";
   } else if (publicPath === "/about") {
-    title = isZh ? "关于我们｜YC Auto USA" : "Our story | YC Auto USA";
+    title = isZh ? "我们的团队｜YC Auto USA" : "Our Staff | YC Auto USA";
     description = isZh
-      ? "了解位于纽约法拉盛的本地二手车行 YC Auto USA。"
+      ? "认识位于纽约法拉盛的 YC Auto USA 本地团队。"
       : "Meet YC Auto USA, a local pre-owned vehicle dealer in Flushing, New York.";
     snippet = isZh
       ? "熟悉本地，认真选车。"
