@@ -24,12 +24,12 @@ import type {
   VehicleImage,
   VehicleStatus,
 } from "../lib/types";
-import { formatMileage, formatPrice } from "../lib/utils";
 import {
   getAdminVehicles,
   getDashboard,
   getHome,
   getInventory,
+  getInventoryFacets,
   getVehicle,
   mutate,
   saveVehicle,
@@ -46,6 +46,12 @@ import {
 } from "../components/VehicleCard";
 import { LeadForm } from "../components/LeadForm";
 import { modelsForMake, VEHICLE_MAKES } from "./vehicle-catalog";
+import {
+  formatLocalizedMileage,
+  formatLocalizedPrice,
+  localizedPath,
+  useLocale,
+} from "./i18n";
 
 function usePageMeta(
   title: string,
@@ -53,6 +59,7 @@ function usePageMeta(
   noIndex = false,
   image?: string,
 ) {
+  const { locale } = useLocale();
   useEffect(() => {
     document.title = title;
     if (description)
@@ -83,6 +90,28 @@ function usePageMeta(
       document.head.appendChild(canonical);
     }
     canonical.href = `${window.location.origin}${window.location.pathname}`;
+    const barePath =
+      window.location.pathname === "/zh"
+        ? "/"
+        : window.location.pathname.startsWith("/zh/")
+          ? window.location.pathname.slice(3)
+          : window.location.pathname;
+    for (const [language, hrefLocale] of [
+      ["en", "en"],
+      ["zh-CN", "zh"],
+      ["x-default", "en"],
+    ] as const) {
+      let alternate = document.querySelector<HTMLLinkElement>(
+        `link[rel="alternate"][hreflang="${language}"]`,
+      );
+      if (!alternate) {
+        alternate = document.createElement("link");
+        alternate.rel = "alternate";
+        alternate.hreflang = language;
+        document.head.appendChild(alternate);
+      }
+      alternate.href = `${window.location.origin}${localizedPath(barePath || "/", hrefLocale)}`;
+    }
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) {
       robots = document.createElement("meta");
@@ -96,46 +125,42 @@ function usePageMeta(
     return () => {
       robots?.setAttribute("content", "index,follow");
     };
-  }, [title, description, noIndex, image]);
+  }, [title, description, noIndex, image, locale]);
 }
 
 function Loading({ label = "Loading" }: { label?: string }) {
+  const { copy } = useLocale();
   return (
     <div className="loading-state" role="status">
       <span className="loading-orbit" />
-      <span>{label}…</span>
+      <span>{label === "Loading" ? copy.common.loading : label}…</span>
     </div>
   );
 }
-function NotFound({
-  label = "We couldn’t find that page.",
-}: {
-  label?: string;
-}) {
+function NotFound({ label }: { label?: string }) {
+  const { copy, path } = useLocale();
   return (
     <section className="empty-page container">
-      <p className="eyebrow">404 / Not found</p>
-      <h1>{label}</h1>
-      <p>Try browsing the current inventory or return home.</p>
-      <Link className="button button--dark" to="/inventory">
-        Browse inventory <Icon name="arrow" size={17} />
+      <p className="eyebrow">{copy.notFound.eyebrow}</p>
+      <h1>{label ?? copy.notFound.title}</h1>
+      <p>{copy.notFound.copy}</p>
+      <Link className="button button--dark" to={path("/inventory")}>
+        {copy.notFound.browse} <Icon name="arrow" size={17} />
       </Link>
     </section>
   );
 }
-function ErrorBlock({
-  message = "Something went wrong. Please try again.",
-}: {
-  message?: string;
-}) {
+function ErrorBlock({ message }: { message?: string }) {
+  const { copy } = useLocale();
   return (
     <div className="inline-error" role="alert">
-      <Icon name="close" size={17} /> {message}
+      <Icon name="close" size={17} /> {message ?? copy.common.error}
     </div>
   );
 }
 
 function HomePage() {
+  const { copy, isZh, path } = useLocale();
   const localDemo =
     typeof window !== "undefined" &&
     /localhost|127\.0\.0\.1/.test(window.location.hostname);
@@ -150,20 +175,28 @@ function HomePage() {
       : [],
     makes: [],
   });
-  const [make, setMake] = useState("");
   const [loadError, setLoadError] = useState("");
-  const navigate = useNavigate();
-  usePageMeta(data.settings.seoTitle, data.settings.seoDescription);
+  usePageMeta(
+    isZh ? data.settings.seoTitleZh || copy.home.title : data.settings.seoTitle,
+    isZh
+      ? data.settings.seoDescriptionZh || copy.home.subtitle
+      : data.settings.seoDescription,
+  );
   useEffect(() => {
     getHome()
       .then(setData)
-      .catch(() => setLoadError("Live inventory is temporarily unavailable."));
-  }, []);
+      .catch(() => setLoadError(copy.home.unavailable));
+  }, [copy.home.unavailable]);
   const settings = data.settings;
-  function browse(event: FormEvent) {
-    event.preventDefault();
-    navigate(`/inventory${make ? `?make=${encodeURIComponent(make)}` : ""}`);
-  }
+  const heroTitle = isZh
+    ? settings.heroTitleZh || copy.home.title
+    : settings.heroTitle;
+  const heroSubtitle = isZh
+    ? settings.heroSubtitleZh || copy.home.subtitle
+    : settings.heroSubtitle;
+  const whyCopy = isZh
+    ? settings.whyChooseTextZh || copy.home.whyFallback
+    : settings.whyChooseText;
   return (
     <>
       {loadError && (
@@ -191,41 +224,29 @@ function HomePage() {
           }),
         }}
       />
-      <section className="hero">
+      <section className="hero hero--light">
         <div className="hero-sheen" />
         <div className="container hero-grid">
           <div className="hero-copy reveal">
-            <p className="eyebrow eyebrow--light">
-              <span className="eyebrow-dot" /> Flushing, New York · Est. local
+            <p className="eyebrow">
+              <span className="eyebrow-dot" /> {copy.home.location}
             </p>
-            <h1>{settings.heroTitle}</h1>
-            <p className="hero-subtitle">{settings.heroSubtitle}</p>
-            <form className="hero-search" onSubmit={browse}>
-              <label className="sr-only" htmlFor="hero-make">
-                Browse by make
-              </label>
-              <select
-                id="hero-make"
-                value={make}
-                onChange={(event) => setMake(event.target.value)}
-              >
-                <option value="">I’m looking for…</option>
-                {data.makes.map((item) => (
-                  <option key={item.make} value={item.make}>
-                    {item.make} ({item.count})
-                  </option>
-                ))}
-              </select>
-              <button className="button button--red" type="submit">
-                Browse inventory <Icon name="arrow" size={17} />
-              </button>
-            </form>
+            <h1>{heroTitle}</h1>
+            <p className="hero-subtitle">{heroSubtitle}</p>
+            <div className="hero-actions">
+              <Link className="button button--red" to={path("/inventory")}>
+                {copy.home.browse} <Icon name="arrow" size={17} />
+              </Link>
+              <Link className="button button--outline" to={path("/trade-sell")}>
+                {copy.home.trade} <Icon name="arrow" size={17} />
+              </Link>
+            </div>
             <div className="hero-proof">
               <span>
-                <Icon name="shield" size={16} /> Curated local inventory
+                <Icon name="shield" size={16} /> {copy.home.proofInventory}
               </span>
               <span>
-                <Icon name="pin" size={16} /> Visit us in Flushing
+                <Icon name="pin" size={16} /> {copy.home.proofVisit}
               </span>
             </div>
           </div>
@@ -241,9 +262,9 @@ function HomePage() {
         </div>
         <div className="hero-ticker">
           <div className="container">
-            <span>Current inventory</span>
+            <span>{copy.home.current}</span>
             <span className="ticker-line" />
-            <span>Updated daily</span>
+            <span>{copy.home.daily}</span>
             <span className="ticker-arrow">↘</span>
           </div>
         </div>
@@ -252,11 +273,11 @@ function HomePage() {
         <div className="container">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">01 / Handpicked</p>
-              <h2>Featured vehicles</h2>
+              <p className="eyebrow">{copy.home.handpicked}</p>
+              <h2>{copy.home.featured}</h2>
             </div>
-            <Link className="arrow-link" to="/inventory">
-              View all inventory <Icon name="arrow" size={17} />
+            <Link className="arrow-link" to={path("/inventory")}>
+              {copy.home.viewAll} <Icon name="arrow" size={17} />
             </Link>
           </div>
           {data.featured.length ? (
@@ -268,8 +289,8 @@ function HomePage() {
           ) : (
             <div className="empty-card">
               <Icon name="car" />
-              <p>New vehicles are arriving soon.</p>
-              <Link to="/inventory">See inventory</Link>
+              <p>{copy.home.arriving}</p>
+              <Link to={path("/inventory")}>{copy.home.seeInventory}</Link>
             </div>
           )}
         </div>
@@ -277,18 +298,15 @@ function HomePage() {
       <section className="section section--makes">
         <div className="container makes-layout">
           <div className="makes-intro">
-            <p className="eyebrow">02 / Find your fit</p>
+            <p className="eyebrow">{copy.home.findFit}</p>
             <h2>
-              Browse by
+              {copy.home.browseBy}
               <br />
-              <em>make.</em>
+              <em>{copy.home.make}</em>
             </h2>
-            <p>
-              Start with a name you trust. Our live inventory changes as
-              vehicles find new homes.
-            </p>
-            <Link className="arrow-link" to="/inventory">
-              Explore all <Icon name="arrow" size={17} />
+            <p>{copy.home.makeIntro}</p>
+            <Link className="arrow-link" to={path("/inventory")}>
+              {copy.home.exploreAll} <Icon name="arrow" size={17} />
             </Link>
           </div>
           <div className="make-list">
@@ -307,13 +325,14 @@ function HomePage() {
               .map((item, index) => (
                 <Link
                   key={item.make}
-                  to={`/inventory?make=${encodeURIComponent(item.make)}`}
+                  to={path(`/inventory?make=${encodeURIComponent(item.make)}`)}
                   className="make-row"
                 >
                   <span className="make-number">0{index + 1}</span>
                   <strong>{item.make}</strong>
                   <span className="make-count">
-                    {item.count} {item.count === 1 ? "vehicle" : "vehicles"}
+                    {item.count}{" "}
+                    {item.count === 1 ? copy.home.vehicle : copy.home.vehicles}
                   </span>
                   <Icon name="arrow" size={18} />
                 </Link>
@@ -332,28 +351,28 @@ function HomePage() {
             </small>
           </div>
           <div>
-            <p className="eyebrow">03 / The YC way</p>
+            <p className="eyebrow">{copy.home.ycWay}</p>
             <h2>
-              A better way to
+              {copy.home.betterWay}
               <br />
-              <em>shop local.</em>
+              <em>{copy.home.shopLocal}</em>
             </h2>
-            <p className="why-copy">{settings.whyChooseText}</p>
+            <p className="why-copy">{whyCopy}</p>
             <div className="why-points">
               <div>
                 <span>01</span>
-                <strong>Clear details</strong>
-                <p>Useful specs and honest photos for every vehicle.</p>
+                <strong>{copy.home.clearTitle}</strong>
+                <p>{copy.home.clearCopy}</p>
               </div>
               <div>
                 <span>02</span>
-                <strong>Human help</strong>
-                <p>Call or send a note—no maze of forms.</p>
+                <strong>{copy.home.humanTitle}</strong>
+                <p>{copy.home.humanCopy}</p>
               </div>
               <div>
                 <span>03</span>
-                <strong>Local roots</strong>
-                <p>Find us on Northern Boulevard in Flushing.</p>
+                <strong>{copy.home.localTitle}</strong>
+                <p>{copy.home.localCopy}</p>
               </div>
             </div>
           </div>
@@ -362,15 +381,15 @@ function HomePage() {
       <section className="cta-band">
         <div className="container cta-band-inner">
           <div>
-            <p className="eyebrow eyebrow--light">Ready when you are</p>
+            <p className="eyebrow eyebrow--light">{copy.home.ready}</p>
             <h2>
-              Let’s find the
+              {copy.home.findRight}
               <br />
-              <em>right one.</em>
+              <em>{copy.home.rightOne}</em>
             </h2>
           </div>
-          <Link className="button button--cream" to="/contact">
-            Talk to YC Auto <Icon name="arrow" size={17} />
+          <Link className="button button--cream" to={path("/contact")}>
+            {copy.home.talk} <Icon name="arrow" size={17} />
           </Link>
         </div>
       </section>
@@ -379,6 +398,7 @@ function HomePage() {
 }
 
 function InventoryPage() {
+  const { copy, isZh } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<{
     vehicles: Vehicle[];
@@ -389,11 +409,25 @@ function InventoryPage() {
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
-  const query = searchParams.toString();
-  usePageMeta(
-    "Inventory | YC Auto USA",
-    "Browse current pre-owned vehicles at YC Auto USA in Flushing, New York.",
-  );
+  const [facets, setFacets] = useState<{
+    makes: Array<{ make: string; count: number }>;
+    years: number[];
+  }>({ makes: [], years: [] });
+  const normalizedParams = new URLSearchParams(searchParams);
+  normalizedParams.delete("model");
+  const query = normalizedParams.toString();
+  usePageMeta(copy.inventory.metaTitle, copy.inventory.metaDescription);
+  useEffect(() => {
+    getInventoryFacets()
+      .then(setFacets)
+      .catch(() => setFacets({ makes: [], years: [] }));
+  }, []);
+  useEffect(() => {
+    if (!searchParams.has("model")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("model");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -408,9 +442,9 @@ function InventoryPage() {
       .catch((reason) => {
         if (active) {
           setLoadError(
-            reason instanceof Error
+            !isZh && reason instanceof Error
               ? reason.message
-              : "Unable to load inventory.",
+              : copy.inventory.loadError,
           );
           setLoading(false);
         }
@@ -418,7 +452,7 @@ function InventoryPage() {
     return () => {
       active = false;
     };
-  }, [query]);
+  }, [query, copy.inventory.loadError, isZh]);
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -431,19 +465,22 @@ function InventoryPage() {
     <section className="inventory-page">
       <div className="container inventory-head">
         <div>
-          <p className="eyebrow">Inventory / Live selection</p>
+          <p className="eyebrow">{copy.inventory.eyebrow}</p>
           <h1>
-            Find your next
+            {copy.inventory.title}
             <br />
-            <em>everyday.</em>
+            <em>{copy.inventory.titleAccent}</em>
           </h1>
         </div>
         <div className="inventory-count">
           <span>{data?.total ?? "—"}</span>
           <small>
-            vehicles
-            <br />
-            to explore
+            {copy.inventory.vehiclesExplore.split("\n").map((line) => (
+              <span key={line}>
+                {line}
+                <br />
+              </span>
+            ))}
           </small>
         </div>
       </div>
@@ -452,27 +489,32 @@ function InventoryPage() {
           className={`filter-panel ${filterOpen ? "filter-panel--open" : ""}`}
         >
           <div className="filter-header">
-            <span className="eyebrow">Filter inventory</span>
+            <span className="eyebrow">{copy.inventory.filter}</span>
             <button
               className="icon-button filter-close"
               onClick={() => setFilterOpen(false)}
-              aria-label="Close filters"
+              aria-label={copy.inventory.closeFilters}
             >
               <Icon name="close" size={18} />
             </button>
           </div>
-          <FilterControls params={searchParams} update={update} clear={clear} />
+          <FilterControls
+            params={searchParams}
+            update={update}
+            clear={clear}
+            facets={facets}
+          />
           <button
             className="button button--dark filter-done"
             onClick={() => setFilterOpen(false)}
           >
-            Show vehicles <Icon name="arrow" size={16} />
+            {copy.inventory.show} <Icon name="arrow" size={16} />
           </button>
         </aside>
         {filterOpen && (
           <button
             className="filter-overlay"
-            aria-label="Close filters"
+            aria-label={copy.inventory.closeFilters}
             onClick={() => setFilterOpen(false)}
           />
         )}
@@ -482,26 +524,26 @@ function InventoryPage() {
               className="filter-trigger"
               onClick={() => setFilterOpen(true)}
             >
-              <Icon name="filter" size={17} /> Filters
+              <Icon name="filter" size={17} /> {copy.inventory.filters}
               {searchParams.size > 0 && <span>{searchParams.size}</span>}
             </button>
             <label className="sort-control">
-              <span>Sort</span>
+              <span>{copy.inventory.sort}</span>
               <select
                 value={searchParams.get("sort") ?? "newest"}
                 onChange={(event) => update("sort", event.target.value)}
               >
-                <option value="newest">Newest added</option>
-                <option value="price_asc">Price: low to high</option>
-                <option value="price_desc">Price: high to low</option>
-                <option value="mileage_asc">Mileage: low to high</option>
-                <option value="year_desc">Year: newest</option>
+                <option value="newest">{copy.inventory.newest}</option>
+                <option value="price_asc">{copy.inventory.priceLow}</option>
+                <option value="price_desc">{copy.inventory.priceHigh}</option>
+                <option value="mileage_asc">{copy.inventory.mileageLow}</option>
+                <option value="year_desc">{copy.inventory.yearNew}</option>
               </select>
               <Icon name="chevron" size={14} />
             </label>
           </div>
           {loading ? (
-            <Loading label="Loading inventory" />
+            <Loading label={copy.inventory.loading} />
           ) : loadError ? (
             <ErrorBlock message={loadError} />
           ) : data && data.vehicles.length > 0 ? (
@@ -523,13 +565,10 @@ function InventoryPage() {
               <span className="empty-icon">
                 <Icon name="search" size={24} />
               </span>
-              <h2>No vehicles match those filters.</h2>
-              <p>
-                Try widening your search or clear the filters to see the full
-                selection.
-              </p>
+              <h2>{copy.inventory.none}</h2>
+              <p>{copy.inventory.noneCopy}</p>
               <button className="button button--dark" onClick={clear}>
-                Clear filters <Icon name="arrow" size={17} />
+                {copy.inventory.clear} <Icon name="arrow" size={17} />
               </button>
             </div>
           )}
@@ -543,60 +582,68 @@ function FilterControls({
   params,
   update,
   clear,
+  facets,
 }: {
   params: URLSearchParams;
   update: (key: string, value: string) => void;
   clear: () => void;
+  facets: {
+    makes: Array<{ make: string; count: number }>;
+    years: number[];
+  };
 }) {
+  const { copy } = useLocale();
   return (
     <div className="filter-controls">
       <label>
-        <span>Make</span>
+        <span>{copy.inventory.make}</span>
         <select
           value={params.get("make") ?? ""}
           onChange={(event) => update("make", event.target.value)}
         >
-          <option value="">All makes</option>
-          {VEHICLE_MAKES.map((make) => (
-            <option key={make}>{make}</option>
+          <option value="">{copy.inventory.allMakes}</option>
+          {facets.makes.map(({ make, count }) => (
+            <option key={make} value={make}>
+              {make} ({count})
+            </option>
           ))}
         </select>
       </label>
-      <label>
-        <span>Model</span>
-        <input
-          value={params.get("model") ?? ""}
-          onChange={(event) => update("model", event.target.value)}
-          placeholder="Any model"
-        />
-      </label>
       <div className="filter-two">
         <label>
-          <span>Min year</span>
-          <input
-            inputMode="numeric"
+          <span>{copy.inventory.minYear}</span>
+          <select
             value={params.get("minYear") ?? ""}
-            onChange={(event) =>
-              update("minYear", event.target.value.replace(/\D/g, ""))
-            }
-            placeholder="2015"
-          />
+            onChange={(event) => update("minYear", event.target.value)}
+          >
+            <option value="">{copy.inventory.anyYear}</option>
+            {[...facets.years]
+              .sort((a, b) => a - b)
+              .map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+          </select>
         </label>
         <label>
-          <span>Max year</span>
-          <input
-            inputMode="numeric"
+          <span>{copy.inventory.maxYear}</span>
+          <select
             value={params.get("maxYear") ?? ""}
-            onChange={(event) =>
-              update("maxYear", event.target.value.replace(/\D/g, ""))
-            }
-            placeholder="2025"
-          />
+            onChange={(event) => update("maxYear", event.target.value)}
+          >
+            <option value="">{copy.inventory.anyYear}</option>
+            {facets.years.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
       <div className="filter-two">
         <label>
-          <span>Min price</span>
+          <span>{copy.inventory.minPrice}</span>
           <input
             inputMode="numeric"
             value={params.get("minPrice") ?? ""}
@@ -607,7 +654,7 @@ function FilterControls({
           />
         </label>
         <label>
-          <span>Max price</span>
+          <span>{copy.inventory.maxPrice}</span>
           <input
             inputMode="numeric"
             value={params.get("maxPrice") ?? ""}
@@ -619,39 +666,39 @@ function FilterControls({
         </label>
       </div>
       <label>
-        <span>Max mileage</span>
+        <span>{copy.inventory.maxMileage}</span>
         <select
           value={params.get("maxMileage") ?? ""}
           onChange={(event) => update("maxMileage", event.target.value)}
         >
-          <option value="">Any mileage</option>
-          <option value="30000">Under 30,000 mi</option>
-          <option value="60000">Under 60,000 mi</option>
-          <option value="90000">Under 90,000 mi</option>
-          <option value="120000">Under 120,000 mi</option>
+          <option value="">{copy.inventory.anyMileage}</option>
+          <option value="30000">{copy.inventory.under} 30,000 mi</option>
+          <option value="60000">{copy.inventory.under} 60,000 mi</option>
+          <option value="90000">{copy.inventory.under} 90,000 mi</option>
+          <option value="120000">{copy.inventory.under} 120,000 mi</option>
         </select>
       </label>
       <label>
-        <span>Body type</span>
+        <span>{copy.inventory.body}</span>
         <select
           value={params.get("bodyType") ?? ""}
           onChange={(event) => update("bodyType", event.target.value)}
         >
-          <option value="">Any body type</option>
+          <option value="">{copy.inventory.anyBody}</option>
           <option>SUV</option>
-          <option>Sedan</option>
-          <option>Truck</option>
-          <option>Wagon</option>
-          <option>Coupe</option>
+          <option value="Sedan">{copy.inventory.sedan}</option>
+          <option value="Truck">{copy.inventory.truck}</option>
+          <option value="Wagon">{copy.inventory.wagon}</option>
+          <option value="Coupe">{copy.inventory.coupe}</option>
         </select>
       </label>
       <label>
-        <span>Drivetrain</span>
+        <span>{copy.inventory.drivetrain}</span>
         <select
           value={params.get("drivetrain") ?? ""}
           onChange={(event) => update("drivetrain", event.target.value)}
         >
-          <option value="">Any drivetrain</option>
+          <option value="">{copy.inventory.anyDrive}</option>
           <option>AWD</option>
           <option>4WD</option>
           <option>FWD</option>
@@ -659,7 +706,7 @@ function FilterControls({
         </select>
       </label>
       <button className="clear-button" onClick={clear}>
-        Clear all filters <Icon name="close" size={14} />
+        {copy.inventory.clearAll} <Icon name="close" size={14} />
       </button>
     </div>
   );
@@ -676,14 +723,15 @@ function Pagination({
   total: number;
   onPage: (page: number) => void;
 }) {
+  const { copy } = useLocale();
   const pages = Math.max(1, Math.ceil(total / perPage));
   if (pages <= 1) return null;
   return (
-    <nav className="pagination" aria-label="Inventory pages">
+    <nav className="pagination" aria-label={copy.inventory.pages}>
       <button
         disabled={page <= 1}
         onClick={() => onPage(page - 1)}
-        aria-label="Previous page"
+        aria-label={copy.inventory.previous}
       >
         ←
       </button>
@@ -701,7 +749,7 @@ function Pagination({
       <button
         disabled={page >= pages}
         onClick={() => onPage(page + 1)}
-        aria-label="Next page"
+        aria-label={copy.inventory.next}
       >
         →
       </button>
@@ -710,6 +758,7 @@ function Pagination({
 }
 
 function VehicleDetailPage() {
+  const { copy, isZh, locale, path } = useLocale();
   const { slug = "" } = useParams();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [settings, setSettings] = useState<SiteSettings>(demoSettings);
@@ -722,7 +771,9 @@ function VehicleDetailPage() {
   const [error, setError] = useState("");
   const touchStart = useRef<number | null>(null);
   usePageMeta(
-    vehicle ? `${vehicle.title} | YC Auto USA` : "Vehicle | YC Auto USA",
+    vehicle
+      ? `${vehicle.title} | YC Auto USA`
+      : `${copy.common.vehicle} | YC Auto USA`,
     vehicle?.description ?? undefined,
     false,
     vehicle ? vehicleImage(vehicle) : undefined,
@@ -740,7 +791,9 @@ function VehicleDetailPage() {
       .catch((reason) => {
         if (alive) {
           setError(
-            reason instanceof Error ? reason.message : "Vehicle not found",
+            !isZh && reason instanceof Error
+              ? reason.message
+              : copy.detail.notFound,
           );
           setLoading(false);
         }
@@ -748,7 +801,7 @@ function VehicleDetailPage() {
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [slug, copy.detail.notFound, isZh]);
   useEffect(() => {
     getHome()
       .then((data) => setSettings(data.settings))
@@ -771,11 +824,11 @@ function VehicleDetailPage() {
   if (loading)
     return (
       <div className="container page-loading">
-        <Loading label="Loading vehicle" />
+        <Loading label={copy.detail.loading} />
       </div>
     );
   if (!vehicle || error)
-    return <NotFound label={error || "Vehicle not found."} />;
+    return <NotFound label={error || copy.detail.notFound} />;
   const images = vehicle.images?.length ? vehicle.images : [];
   const image = images[activeImage] ?? images[0];
   const imageSrc = image?.r2Key
@@ -825,7 +878,7 @@ function VehicleDetailPage() {
       />
       <section className="detail-page">
         <div className="container detail-breadcrumb">
-          <Link to="/inventory">Inventory</Link>
+          <Link to={path("/inventory")}>{copy.detail.inventory}</Link>
           <span>/</span>
           <span>{vehicle.title}</span>
         </div>
@@ -880,7 +933,7 @@ function VehicleDetailPage() {
                           ? `/media/${item.r2Key}?w=320&format=webp`
                           : vehicleImage(vehicle)
                       }
-                      alt={`${vehicle.title} view ${index + 1}`}
+                      alt={`${vehicle.title} ${copy.detail.imageView} ${index + 1}`}
                       width="160"
                       height="108"
                     />
@@ -891,20 +944,20 @@ function VehicleDetailPage() {
           </div>
           <div className="detail-copy">
             <p className="eyebrow">
-              {vehicle.year ?? "—"} / {vehicle.bodyType ?? "Pre-owned vehicle"}
+              {vehicle.year ?? "—"} /{" "}
+              {vehicle.bodyType ?? copy.detail.preownedVehicle}
             </p>
             <h1>{vehicle.title}</h1>
             <div className="detail-price">
-              <strong>{formatPrice(vehicle.priceCents)}</strong>
-              <span>{formatMileage(vehicle.mileage)}</span>
+              <strong>
+                {formatLocalizedPrice(vehicle.priceCents, locale)}
+              </strong>
+              <span>{formatLocalizedMileage(vehicle.mileage, locale)}</span>
             </div>
             {(sold || pending) && (
               <div className={`detail-status detail-status--${vehicle.status}`}>
                 <span />
-                This vehicle is {vehicle.status}.{" "}
-                {sold
-                  ? "Explore similar available vehicles below."
-                  : "Ask us about timing and alternatives."}
+                {sold ? copy.detail.statusSold : copy.detail.statusPending}
               </div>
             )}
             <div className="detail-actions">
@@ -913,7 +966,7 @@ function VehicleDetailPage() {
                 href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}
                 onClick={() => trackEvent("phone_click", vehicle.id)}
               >
-                <Icon name="phone" size={17} /> Call about this car
+                <Icon name="phone" size={17} /> {copy.detail.call}
               </a>
               {!sold && settings.smsNumber.trim() && (
                 <a
@@ -921,7 +974,7 @@ function VehicleDetailPage() {
                   href={`sms:${settings.smsNumber.replace(/[^\d+]/g, "")}`}
                   onClick={() => trackEvent("sms_click", vehicle.id)}
                 >
-                  <Icon name="message" size={17} /> Text us
+                  <Icon name="message" size={17} /> {copy.detail.text}
                 </a>
               )}
               {!sold && (
@@ -932,7 +985,7 @@ function VehicleDetailPage() {
                     setFormType("availability");
                   }}
                 >
-                  <Icon name="message" size={17} /> Check availability
+                  <Icon name="message" size={17} /> {copy.detail.availability}
                 </button>
               )}
               {!sold && (
@@ -940,7 +993,7 @@ function VehicleDetailPage() {
                   className="button button--outline"
                   onClick={() => setFormType("test_drive")}
                 >
-                  <Icon name="calendar" size={17} /> Schedule a test drive
+                  <Icon name="calendar" size={17} /> {copy.detail.testDrive}
                 </button>
               )}
             </div>
@@ -953,7 +1006,7 @@ function VehicleDetailPage() {
               )}
               {vehicle.stockNumber && (
                 <div>
-                  <span>Stock no.</span>
+                  <span>{copy.detail.stock}</span>
                   <strong>{vehicle.stockNumber}</strong>
                 </div>
               )}
@@ -961,21 +1014,20 @@ function VehicleDetailPage() {
             <div className="spec-grid">
               {specs.map(([label, value]) => (
                 <div key={String(label)}>
-                  <span>{label}</span>
+                  <span>
+                    {copy.detail.specs[label as keyof typeof copy.detail.specs]}
+                  </span>
                   <strong>{String(value)}</strong>
                 </div>
               ))}
             </div>
             <div className="detail-description">
-              <p className="eyebrow">The details</p>
-              <p>
-                {vehicle.description ||
-                  "Details available by request. Call or send a note and we’ll be happy to help."}
-              </p>
+              <p className="eyebrow">{copy.detail.details}</p>
+              <p>{vehicle.description || copy.detail.detailsFallback}</p>
             </div>
             {vehicle.features.length > 0 && (
               <div className="feature-list">
-                <p className="eyebrow">Highlights</p>
+                <p className="eyebrow">{copy.detail.highlights}</p>
                 <ul>
                   {vehicle.features.map((feature) => (
                     <li key={feature}>
@@ -994,14 +1046,17 @@ function VehicleDetailPage() {
           <div className="container">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">More to consider</p>
-                <h2>Similar vehicles</h2>
+                <p className="eyebrow">{copy.detail.more}</p>
+                <h2>{copy.detail.similar}</h2>
               </div>
               <Link
                 className="arrow-link"
-                to={`/inventory?make=${encodeURIComponent(vehicle.make ?? "")}`}
+                to={path(
+                  `/inventory?make=${encodeURIComponent(vehicle.make ?? "")}`,
+                )}
               >
-                See all {vehicle.make} <Icon name="arrow" size={17} />
+                {copy.detail.seeAll} {vehicle.make}{" "}
+                <Icon name="arrow" size={17} />
               </Link>
             </div>
             <div className="vehicle-grid">
@@ -1015,19 +1070,17 @@ function VehicleDetailPage() {
       <section className="detail-contact">
         <div className="container detail-contact-inner">
           <div>
-            <p className="eyebrow eyebrow--light">Have a question?</p>
+            <p className="eyebrow eyebrow--light">{copy.detail.question}</p>
             <h2>
-              Make it
+              {copy.detail.makeIt}
               <br />
-              <em>yours.</em>
+              <em>{copy.detail.yours}</em>
             </h2>
-            <p>
-              Tell us what you’re looking for and we’ll get right back to you.
-            </p>
+            <p>{copy.detail.questionCopy}</p>
           </div>
           {sold ? (
-            <Link className="button button--cream" to="/inventory">
-              Browse available inventory <Icon name="arrow" size={17} />
+            <Link className="button button--cream" to={path("/inventory")}>
+              {copy.detail.browseAvailable} <Icon name="arrow" size={17} />
             </Link>
           ) : (
             <button
@@ -1037,7 +1090,7 @@ function VehicleDetailPage() {
                 setFormType("availability");
               }}
             >
-              Send a message <Icon name="arrow" size={17} />
+              {copy.detail.send} <Icon name="arrow" size={17} />
             </button>
           )}
         </div>
@@ -1046,8 +1099,8 @@ function VehicleDetailPage() {
         <Modal
           title={
             vehicle.status === "pending"
-              ? "Ask about this vehicle"
-              : "Check availability"
+              ? copy.detail.ask
+              : copy.detail.availability
           }
           onClose={() => setFormType(null)}
         >
@@ -1059,7 +1112,7 @@ function VehicleDetailPage() {
           href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}
           onClick={() => trackEvent("phone_click", vehicle.id)}
         >
-          <Icon name="phone" size={17} /> Call
+          <Icon name="phone" size={17} /> {copy.detail.callShort}
         </a>
         {!sold && (
           <button
@@ -1068,7 +1121,7 @@ function VehicleDetailPage() {
               setFormType("availability");
             }}
           >
-            <Icon name="message" size={17} /> Message
+            <Icon name="message" size={17} /> {copy.detail.messageShort}
           </button>
         )}
       </div>
@@ -1077,69 +1130,71 @@ function VehicleDetailPage() {
 }
 
 function AboutPage() {
+  const { copy, isZh, path } = useLocale();
   const [settings, setSettings] = useState(demoSettings);
-  usePageMeta(
-    "Our story | YC Auto USA",
-    "Meet YC Auto USA, a local pre-owned vehicle dealer in Flushing, New York.",
-  );
+  usePageMeta(copy.about.metaTitle, copy.about.metaDescription);
   useEffect(() => {
     getHome().then((data) => setSettings(data.settings));
   }, []);
   return (
     <section className="editorial-page">
       <div className="container editorial-hero">
-        <p className="eyebrow">Our story / YC Auto USA</p>
+        <p className="eyebrow">{copy.about.eyebrow}</p>
         <h1>
-          Local knowledge.
+          {copy.about.title}
           <br />
-          <em>Good cars.</em>
+          <em>{copy.about.accent}</em>
         </h1>
-        <p className="editorial-lede">
-          A straightforward place to find your next vehicle in Flushing, New
-          York.
-        </p>
+        <p className="editorial-lede">{copy.about.lede}</p>
       </div>
       <div className="container editorial-grid">
         <div className="editorial-rail">
           <span>YC</span>
           <small>
-            ABOUT
-            <br />
-            THE SHOP
+            {copy.about.rail.split("\n").map((line) => (
+              <span key={line}>
+                {line}
+                <br />
+              </span>
+            ))}
           </small>
         </div>
         <div className="editorial-body">
-          <p>{settings.aboutText}</p>
+          <p>
+            {isZh
+              ? settings.aboutTextZh || copy.about.lede
+              : settings.aboutText}
+          </p>
           <figure className="about-team-photo">
             <img
               src="/brand/team.jpg"
-              alt="The Your Choice Auto Group team at the Flushing showroom"
+              alt={copy.about.photoAlt}
               width="1920"
               height="1435"
               loading="lazy"
               decoding="async"
             />
-            <figcaption>Your Choice Auto Group · Flushing, New York</figcaption>
+            <figcaption>{copy.about.caption}</figcaption>
           </figure>
           <div className="about-notes">
             <div>
               <span>01</span>
-              <strong>Browse at your pace</strong>
-              <p>Start online, then visit when it feels right.</p>
+              <strong>{copy.about.pace}</strong>
+              <p>{copy.about.paceCopy}</p>
             </div>
             <div>
               <span>02</span>
-              <strong>Ask a real person</strong>
-              <p>Call or send a note—whatever is easiest.</p>
+              <strong>{copy.about.person}</strong>
+              <p>{copy.about.personCopy}</p>
             </div>
             <div>
               <span>03</span>
-              <strong>Find us locally</strong>
+              <strong>{copy.about.local}</strong>
               <p>{settings.address}</p>
             </div>
           </div>
-          <Link className="button button--dark" to="/inventory">
-            See current inventory <Icon name="arrow" size={17} />
+          <Link className="button button--dark" to={path("/inventory")}>
+            {copy.about.inventory} <Icon name="arrow" size={17} />
           </Link>
         </div>
       </div>
@@ -1147,123 +1202,189 @@ function AboutPage() {
   );
 }
 
-function ContactPage() {
-  const [settings, setSettings] = useState(demoSettings);
-  usePageMeta(
-    "Contact | YC Auto USA",
-    "Call, email, or send a message to YC Auto USA in Flushing, New York.",
-  );
-  useEffect(() => {
-    getHome().then((data) => setSettings(data.settings));
-  }, []);
+function LocationMap({ settings }: { settings: SiteSettings }) {
+  const { copy, isZh } = useLocale();
+  const query = encodeURIComponent(settings.address);
   return (
-    <section className="contact-page">
-      <div className="container contact-head">
-        <div>
-          <p className="eyebrow">Contact / We’re here</p>
-          <h1>
-            Let’s talk
-            <br />
-            <em>cars.</em>
-          </h1>
-          <p>Tell us what caught your eye, or simply say hello.</p>
-        </div>
-        <div className="contact-direct">
-          <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}>
-            <span>Call</span>
-            <strong>{settings.phone}</strong>
-            <Icon name="arrow" size={17} />
-          </a>
+    <section className="location-section">
+      <div className="container location-grid">
+        <div className="location-copy">
+          <p className="eyebrow">{copy.map.eyebrow}</p>
+          <h2>{copy.map.title}</h2>
+          <p>{settings.address}</p>
+          <p>{isZh ? copy.contact.hours : settings.businessHours}</p>
           <a
-            href={`mailto:${settings.email}`}
-            onClick={() => trackEvent("email_click")}
+            className="button button--dark"
+            href={`https://www.google.com/maps/dir/?api=1&destination=${query}`}
+            target="_blank"
+            rel="noreferrer"
           >
-            <span>Email</span>
-            <strong>{settings.email}</strong>
-            <Icon name="arrow" size={17} />
+            {copy.map.directions} <Icon name="arrow" size={17} />
           </a>
-          <div>
-            <span>Visit</span>
-            <strong>{settings.address}</strong>
-            <small>{settings.businessHours}</small>
-          </div>
         </div>
-      </div>
-      <div className="container contact-form-wrap">
-        <div className="contact-form-intro">
-          <p className="eyebrow">Send a note</p>
-          <h2>
-            We’ll get
-            <br />
-            <em>back to you.</em>
-          </h2>
-          <p>Usually within one business day.</p>
+        <div className="location-map">
+          <iframe
+            title={copy.map.frameTitle}
+            src={`https://www.google.com/maps?q=${query}&output=embed`}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         </div>
-        <LeadForm type="contact" />
       </div>
     </section>
   );
 }
 
+function ContactPage() {
+  const { copy, isZh } = useLocale();
+  const [settings, setSettings] = useState(demoSettings);
+  usePageMeta(copy.contact.metaTitle, copy.contact.metaDescription);
+  useEffect(() => {
+    getHome().then((data) => setSettings(data.settings));
+  }, []);
+  return (
+    <>
+      <section className="contact-page">
+        <div className="container contact-head">
+          <div>
+            <p className="eyebrow">{copy.contact.eyebrow}</p>
+            <h1>
+              {copy.contact.title}
+              <br />
+              <em>{copy.contact.accent}</em>
+            </h1>
+            <p>{copy.contact.intro}</p>
+          </div>
+          <div className="contact-direct">
+            <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}>
+              <span>{copy.contact.call}</span>
+              <strong>{settings.phone}</strong>
+              <Icon name="arrow" size={17} />
+            </a>
+            <a
+              href={`mailto:${settings.email}`}
+              onClick={() => trackEvent("email_click")}
+            >
+              <span>{copy.lead.email}</span>
+              <strong>{settings.email}</strong>
+              <Icon name="arrow" size={17} />
+            </a>
+            <div>
+              <span>{copy.contact.visit}</span>
+              <strong>{settings.address}</strong>
+              <small>
+                {isZh ? copy.contact.hours : settings.businessHours}
+              </small>
+            </div>
+          </div>
+        </div>
+        <div className="container contact-form-wrap">
+          <div className="contact-form-intro">
+            <p className="eyebrow">{copy.contact.note}</p>
+            <h2>
+              {copy.contact.getBack}
+              <br />
+              <em>{copy.contact.getBackAccent}</em>
+            </h2>
+            <p>{copy.contact.timing}</p>
+          </div>
+          <LeadForm type="contact" />
+        </div>
+      </section>
+      <LocationMap settings={settings} />
+    </>
+  );
+}
+
+function TradeSellPage() {
+  const { copy } = useLocale();
+  const [settings, setSettings] = useState(demoSettings);
+  usePageMeta(copy.trade.metaTitle, copy.trade.metaDescription);
+  useEffect(() => {
+    getHome()
+      .then((data) => setSettings(data.settings))
+      .catch(() => undefined);
+  }, []);
+  const steps = [
+    ["01", copy.trade.step1, copy.trade.step1Copy],
+    ["02", copy.trade.step2, copy.trade.step2Copy],
+    ["03", copy.trade.step3, copy.trade.step3Copy],
+  ];
+  return (
+    <>
+      <section className="trade-page">
+        <div className="container trade-hero">
+          <div>
+            <p className="eyebrow">{copy.trade.eyebrow}</p>
+            <h1>
+              {copy.trade.title}
+              <br />
+              <em>{copy.trade.accent}</em>
+            </h1>
+            <p className="trade-lede">{copy.trade.intro}</p>
+          </div>
+          <div className="trade-steps">
+            {steps.map(([number, title, body]) => (
+              <div key={number}>
+                <span>{number}</span>
+                <strong>{title}</strong>
+                <p>{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="container trade-form-wrap">
+          <div className="trade-form-intro">
+            <p className="eyebrow">{copy.trade.formEyebrow}</p>
+            <h2>{copy.trade.formTitle}</h2>
+          </div>
+          <LeadForm type="trade_sell" />
+        </div>
+      </section>
+      <LocationMap settings={settings} />
+    </>
+  );
+}
+
 function LegalPage({ kind }: { kind: "privacy" | "terms" }) {
+  const { copy } = useLocale();
   const privacy = kind === "privacy";
-  usePageMeta(`${privacy ? "Privacy" : "Terms"} | YC Auto USA`, undefined);
+  usePageMeta(
+    `${privacy ? copy.legal.privacy : copy.legal.terms} | YC Auto USA`,
+    undefined,
+  );
   return (
     <section className="legal-page container">
-      <p className="eyebrow">YC Auto USA / {privacy ? "Privacy" : "Terms"}</p>
-      <h1>{privacy ? "Privacy policy" : "Terms of use"}</h1>
-      <p className="legal-updated">Last updated August 29, 2026</p>
+      <p className="eyebrow">
+        YC Auto USA / {privacy ? copy.legal.privacy : copy.legal.terms}
+      </p>
+      <h1>{privacy ? copy.legal.privacy : copy.legal.terms}</h1>
+      <p className="legal-updated">{copy.legal.updated}</p>
       {privacy ? (
         <>
-          <h2>Information we receive</h2>
+          <h2>{copy.legal.infoTitle}</h2>
+          <p>{copy.legal.info}</p>
+          <h2>{copy.legal.useTitle}</h2>
+          <p>{copy.legal.use}</p>
+          <h2>{copy.legal.analyticsTitle}</h2>
+          <p>{copy.legal.analytics}</p>
+          <h2>{copy.legal.contactTitle}</h2>
           <p>
-            When you contact YC Auto USA, we receive the details you choose to
-            share, such as your name, phone number, email address, and message.
-            We use that information to respond to your request and help with
-            vehicle availability.
-          </p>
-          <h2>How we use it</h2>
-          <p>
-            We use submitted information to communicate with you about your
-            request, keep basic lead records, and improve the website. We do not
-            sell lead information or send it to vehicle-data vendors.
-          </p>
-          <h2>Cookies and analytics</h2>
-          <p>
-            The site may use Cloudflare Web Analytics for aggregate traffic
-            measurement. The website does not require an account or use
-            advertising trackers to browse inventory.
-          </p>
-          <h2>Contact</h2>
-          <p>
-            Questions about this policy can be sent to{" "}
+            {copy.legal.contact}{" "}
             <a href="mailto:sophie@youxuancars.com">sophie@youxuancars.com</a>.
           </p>
         </>
       ) : (
         <>
-          <h2>Inventory information</h2>
+          <h2>{copy.legal.inventoryTitle}</h2>
+          <p>{copy.legal.inventory}</p>
+          <h2>{copy.legal.websiteTitle}</h2>
+          <p>{copy.legal.website}</p>
+          <h2>{copy.legal.accuracyTitle}</h2>
+          <p>{copy.legal.accuracy}</p>
+          <h2>{copy.legal.questionsTitle}</h2>
           <p>
-            Vehicle availability, pricing, mileage, and descriptions can change
-            without notice. A vehicle shown as available is not reserved until
-            confirmed by YC Auto USA.
-          </p>
-          <h2>Website use</h2>
-          <p>
-            Please use the website and contact forms for lawful purposes. We may
-            decline messages that are abusive, automated, or unrelated to
-            vehicle inquiries.
-          </p>
-          <h2>Accuracy</h2>
-          <p>
-            We work to keep information current, but the website may contain
-            occasional errors. Contact us to confirm details before making a
-            purchasing decision.
-          </p>
-          <h2>Questions</h2>
-          <p>
-            For questions about these terms, call{" "}
-            <a href="tel:7187990606">718-799-0606</a>.
+            {copy.legal.questions} <a href="tel:7187990606">718-799-0606</a>.
           </p>
         </>
       )}
@@ -1280,6 +1401,7 @@ function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { copy } = useLocale();
   return (
     <div
       className="modal-backdrop"
@@ -1291,7 +1413,11 @@ function Modal({
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
+          <button
+            className="icon-button"
+            onClick={onClose}
+            aria-label={copy.common.close}
+          >
             <Icon name="close" />
           </button>
         </div>
@@ -3077,8 +3203,18 @@ function AdminLeadsPage() {
                 </span>
                 <span className="lead-row-copy">
                   <strong>{lead.name}</strong>
-                  <small>{lead.vehicle?.title ?? "General inquiry"}</small>
-                  <p>{lead.message || "No message provided."}</p>
+                  <small>
+                    {lead.vehicle?.title ??
+                      (lead.leadType === "trade_sell"
+                        ? "Trade/Sell request"
+                        : "General inquiry")}
+                  </small>
+                  <p>
+                    {lead.message ||
+                      (lead.details.vin
+                        ? `VIN ${lead.details.vin}`
+                        : "No message provided.")}
+                  </p>
                 </span>
                 <span className={`lead-status lead-status--${lead.status}`}>
                   {lead.status}
@@ -3168,6 +3304,26 @@ function LeadDetail({
           <strong>{new Date(lead.createdAt).toLocaleString()}</strong>
         </div>
       </div>
+      {lead.leadType === "trade_sell" && (
+        <div className="lead-contact-grid lead-trade-details">
+          <div>
+            <span>VIN / chassis number</span>
+            <strong>{lead.details.vin ?? "Not provided"}</strong>
+          </div>
+          <div>
+            <span>Mileage</span>
+            <strong>
+              {lead.details.mileage !== undefined
+                ? `${lead.details.mileage.toLocaleString("en-US")} mi`
+                : "Not provided"}
+            </strong>
+          </div>
+          <div>
+            <span>WeChat</span>
+            <strong>{lead.details.wechat ?? "Not provided"}</strong>
+          </div>
+        </div>
+      )}
       <div className="lead-message">
         <span>Message</span>
         <p>{lead.message || "No message provided."}</p>
@@ -3375,6 +3531,23 @@ function AdminSettingsPage() {
                 required
               />
             </Field>
+            <Field label="Hero title — Chinese">
+              <input
+                value={settings.heroTitleZh ?? ""}
+                onChange={(event) =>
+                  set("heroTitleZh", event.target.value || null)
+                }
+                placeholder="找到你的下一辆车"
+              />
+            </Field>
+            <Field label="Hero subtitle — Chinese">
+              <input
+                value={settings.heroSubtitleZh ?? ""}
+                onChange={(event) =>
+                  set("heroSubtitleZh", event.target.value || null)
+                }
+              />
+            </Field>
           </div>
           <Field label="About text">
             <textarea
@@ -3383,11 +3556,29 @@ function AdminSettingsPage() {
               onChange={(event) => set("aboutText", event.target.value)}
             />
           </Field>
+          <Field label="About text — Chinese">
+            <textarea
+              rows={5}
+              value={settings.aboutTextZh ?? ""}
+              onChange={(event) =>
+                set("aboutTextZh", event.target.value || null)
+              }
+            />
+          </Field>
           <Field label="Why choose YC Auto">
             <textarea
               rows={4}
               value={settings.whyChooseText}
               onChange={(event) => set("whyChooseText", event.target.value)}
+            />
+          </Field>
+          <Field label="Why choose YC Auto — Chinese">
+            <textarea
+              rows={4}
+              value={settings.whyChooseTextZh ?? ""}
+              onChange={(event) =>
+                set("whyChooseTextZh", event.target.value || null)
+              }
             />
           </Field>
         </section>
@@ -3410,6 +3601,23 @@ function AdminSettingsPage() {
               rows={3}
               value={settings.seoDescription}
               onChange={(event) => set("seoDescription", event.target.value)}
+            />
+          </Field>
+          <Field label="SEO title — Chinese">
+            <input
+              value={settings.seoTitleZh ?? ""}
+              onChange={(event) =>
+                set("seoTitleZh", event.target.value || null)
+              }
+            />
+          </Field>
+          <Field label="SEO description — Chinese">
+            <textarea
+              rows={3}
+              value={settings.seoDescriptionZh ?? ""}
+              onChange={(event) =>
+                set("seoDescriptionZh", event.target.value || null)
+              }
             />
           </Field>
         </section>
@@ -3489,6 +3697,18 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:slug" element={<VehicleDetailPage />} />
+        <Route path="trade-sell" element={<TradeSellPage />} />
+        <Route path="about" element={<AboutPage />} />
+        <Route path="contact" element={<ContactPage />} />
+        <Route path="privacy" element={<LegalPage kind="privacy" />} />
+        <Route path="terms" element={<LegalPage kind="terms" />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+      <Route path="zh" element={<PublicLayout />}>
+        <Route index element={<HomePage />} />
+        <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/:slug" element={<VehicleDetailPage />} />
+        <Route path="trade-sell" element={<TradeSellPage />} />
         <Route path="about" element={<AboutPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="privacy" element={<LegalPage kind="privacy" />} />

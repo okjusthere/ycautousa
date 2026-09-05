@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import type { Vehicle } from "../lib/types";
 import { mutate } from "../src/api";
 import { Icon } from "./Icon";
+import { useLocale } from "../src/i18n";
 
 declare global {
   interface Window {
@@ -27,9 +28,11 @@ export function LeadForm({
   compact = false,
 }: {
   vehicle?: Vehicle | null;
-  type?: "availability" | "test_drive" | "contact";
+  type?: "availability" | "test_drive" | "contact" | "trade_sell";
   compact?: boolean;
 }) {
+  const { copy, isZh, path } = useLocale();
+  const isTrade = type === "trade_sell";
   const [status, setStatus] = useState<
     "idle" | "sending" | "success" | "error"
   >("idle");
@@ -90,17 +93,47 @@ export function LeadForm({
     const form = new FormData(formElement);
     if (!turnstileToken) {
       setStatus("error");
-      setError("Please complete the verification and try again.");
+      setError(copy.lead.verifyError);
+      return;
+    }
+    const phone = String(form.get("phone") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const wechat = String(form.get("wechat") ?? "").trim();
+    const vin = String(form.get("vin") ?? "")
+      .replace(/\s/g, "")
+      .toUpperCase();
+    const mileage = String(form.get("mileage") ?? "").replace(/[,\s]/g, "");
+    if (
+      isTrade &&
+      (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin) || /^([A-Z0-9])\1+$/.test(vin))
+    ) {
+      setStatus("error");
+      setError(copy.lead.invalidVin);
+      return;
+    }
+    if (isTrade && (!/^\d+$/.test(mileage) || Number(mileage) > 2_000_000)) {
+      setStatus("error");
+      setError(copy.lead.invalidMileage);
+      return;
+    }
+    if (isTrade && !phone && !email && !wechat) {
+      setStatus("error");
+      setError(copy.lead.invalidContact);
       return;
     }
     const payload = {
       vehicleId: vehicle?.id ?? null,
       leadType: type,
       name: form.get("name"),
-      phone: form.get("phone") || null,
-      email: form.get("email") || null,
-      preferredContact: form.get("preferredContact") || "phone",
+      phone: phone || null,
+      email: email || null,
+      preferredContact:
+        form.get("preferredContact") ||
+        (phone ? "phone" : email ? "email" : "wechat"),
       message: form.get("message") || null,
+      ...(isTrade
+        ? { vin, mileage: Number(mileage), wechat: wechat || null }
+        : {}),
       sourceUrl: window.location.href,
       referrer: document.referrer || null,
       utm: Object.fromEntries(
@@ -119,9 +152,9 @@ export function LeadForm({
     } catch (submissionError) {
       setStatus("error");
       setError(
-        submissionError instanceof Error
+        !isZh && submissionError instanceof Error
           ? submissionError.message
-          : "Please try again.",
+          : copy.lead.tryAgain,
       );
     }
   }
@@ -131,11 +164,8 @@ export function LeadForm({
         <span className="success-mark">
           <Icon name="check" />
         </span>
-        <h3>Message received.</h3>
-        <p>
-          Thanks for reaching out. A member of the YC Auto team will follow up
-          shortly.
-        </p>
+        <h3>{isTrade ? copy.lead.tradeReceived : copy.lead.received}</h3>
+        <p>{isTrade ? copy.lead.tradeThanks : copy.lead.thanks}</p>
         <button
           className="text-button"
           onClick={() => {
@@ -144,7 +174,8 @@ export function LeadForm({
               setTurnstileToken("local-form-token");
           }}
         >
-          Send another message <Icon name="arrow" size={16} />
+          {isTrade ? copy.lead.anotherTrade : copy.lead.another}{" "}
+          <Icon name="arrow" size={16} />
         </button>
       </div>
     );
@@ -158,63 +189,111 @@ export function LeadForm({
         <div className="form-context">
           <Icon name="car" size={16} />
           <span>
-            Asking about <strong>{vehicle.title}</strong>
+            {copy.lead.asking} <strong>{vehicle.title}</strong>
           </span>
         </div>
       )}
       <div className="form-grid">
         <label>
-          <span>Name *</span>
+          <span>{copy.lead.name}</span>
           <input
             name="name"
-            aria-label="Name *"
+            aria-label={copy.lead.name}
             required
             minLength={2}
             maxLength={100}
-            placeholder="Your name"
+            placeholder={copy.lead.namePlaceholder}
           />
         </label>
         <label>
-          <span>Phone</span>
+          <span>{copy.lead.phone}</span>
           <input
             name="phone"
-            aria-label="Phone"
+            aria-label={copy.lead.phone}
             type="tel"
             maxLength={40}
             placeholder="(718) 555-0123"
           />
         </label>
         <label>
-          <span>Email</span>
+          <span>{copy.lead.email}</span>
           <input
             name="email"
-            aria-label="Email"
+            aria-label={copy.lead.email}
             type="email"
             maxLength={254}
             placeholder="you@example.com"
           />
         </label>
-        <label>
-          <span>Preferred contact</span>
-          <select
-            name="preferredContact"
-            aria-label="Preferred contact"
-            defaultValue="phone"
-          >
-            <option value="phone">Phone call</option>
-            <option value="email">Email</option>
-          </select>
-        </label>
+        {!isTrade && (
+          <label>
+            <span>{copy.lead.preferred}</span>
+            <select
+              name="preferredContact"
+              aria-label={copy.lead.preferred}
+              defaultValue="phone"
+            >
+              <option value="phone">{copy.lead.phoneCall}</option>
+              <option value="email">{copy.lead.email}</option>
+            </select>
+          </label>
+        )}
+        {isTrade && (
+          <>
+            <label>
+              <span>{copy.lead.wechat}</span>
+              <input
+                name="wechat"
+                aria-label={copy.lead.wechat}
+                maxLength={100}
+                placeholder={copy.lead.wechatPlaceholder}
+              />
+            </label>
+            <label>
+              <span>{copy.lead.vin}</span>
+              <input
+                name="vin"
+                aria-label={copy.lead.vin}
+                required
+                minLength={17}
+                maxLength={17}
+                autoCapitalize="characters"
+                autoComplete="off"
+                placeholder={copy.lead.vinPlaceholder}
+                onInput={(event) => {
+                  event.currentTarget.value = event.currentTarget.value
+                    .replace(/\s/g, "")
+                    .toUpperCase();
+                }}
+              />
+            </label>
+            <label>
+              <span>{copy.lead.mileage}</span>
+              <div className="input-suffix">
+                <input
+                  name="mileage"
+                  aria-label={copy.lead.mileage}
+                  inputMode="numeric"
+                  required
+                  maxLength={9}
+                  placeholder={copy.lead.mileagePlaceholder}
+                />
+                <span>mi</span>
+              </div>
+            </label>
+          </>
+        )}
       </div>
+      {isTrade && <p className="form-hint">{copy.lead.contactHint}</p>}
       <label>
-        <span>Message</span>
+        <span>{copy.lead.message}</span>
         <textarea
           name="message"
-          aria-label="Message"
+          aria-label={copy.lead.message}
           rows={compact ? 3 : 4}
           maxLength={3000}
           placeholder={
-            vehicle ? "Is this vehicle still available?" : "How can we help?"
+            vehicle ? copy.lead.vehicleMessage : copy.lead.helpMessage
           }
         />
       </label>
@@ -225,7 +304,7 @@ export function LeadForm({
       <div
         ref={turnstileRef}
         className="turnstile-widget"
-        aria-label="Security verification"
+        aria-label={copy.lead.verification}
       />
       <input type="hidden" name="turnstileToken" value={turnstileToken} />
       {error && (
@@ -235,14 +314,17 @@ export function LeadForm({
       )}
       <div className="form-submit-row">
         <p className="form-privacy">
-          By submitting, you agree to our <a href="/privacy">privacy policy</a>.
+          {copy.lead.privacyBefore}{" "}
+          <a href={path("/privacy")}>{copy.lead.privacy}</a>.
         </p>
         <button className="button button--red" disabled={status === "sending"}>
           {status === "sending"
-            ? "Sending…"
+            ? copy.lead.sending
             : type === "test_drive"
-              ? "Request a test drive"
-              : "Send message"}{" "}
+              ? copy.lead.requestDrive
+              : isTrade
+                ? copy.lead.submitTrade
+                : copy.lead.send}{" "}
           <Icon name="arrow" size={17} />
         </button>
       </div>

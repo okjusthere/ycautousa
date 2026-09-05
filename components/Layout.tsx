@@ -4,14 +4,16 @@ import type { SiteSettings } from "../lib/types";
 import { demoSettings } from "../src/demo";
 import { getHome } from "../src/api";
 import { Icon } from "./Icon";
+import { useLocale } from "../src/i18n";
 
 export function Wordmark({ inverse = false }: { inverse?: boolean }) {
+  const { path } = useLocale();
   const logo = inverse
     ? { src: "/brand/logo-light.png", width: 838, height: 219 }
     : { src: "/brand/logo-dark.png", width: 1026, height: 210 };
   return (
     <Link
-      to="/"
+      to={path("/")}
       className={`wordmark ${inverse ? "wordmark--inverse" : ""}`}
       aria-label="YC Auto USA home"
     >
@@ -31,6 +33,7 @@ export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<SiteSettings>(demoSettings);
   const location = useLocation();
+  const { copy, path, switchPath, locale } = useLocale();
   useEffect(() => {
     let alive = true;
     getHome().then((data) => {
@@ -47,45 +50,59 @@ export function PublicLayout() {
   return (
     <div className="site-shell">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {copy.nav.skip}
       </a>
       <header className="site-header">
         <div className="container header-inner">
           <Wordmark inverse />
           <button
             className="icon-button mobile-menu"
-            aria-label={open ? "Close menu" : "Open menu"}
+            aria-label={open ? copy.nav.closeMenu : copy.nav.menu}
             onClick={() => setOpen((value) => !value)}
           >
             <Icon name={open ? "close" : "menu"} />
           </button>
           <nav
             className={`main-nav ${open ? "main-nav--open" : ""}`}
-            aria-label="Main navigation"
+            aria-label={copy.nav.main}
           >
             <NavLink
-              to="/inventory"
+              to={path("/inventory")}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              Inventory
+              {copy.nav.inventory}
             </NavLink>
             <NavLink
-              to="/about"
+              to={path("/trade-sell")}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              Our story
+              {copy.nav.trade}
             </NavLink>
             <NavLink
-              to="/contact"
+              to={path("/about")}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              Contact
+              {copy.nav.story}
             </NavLink>
+            <NavLink
+              to={path("/contact")}
+              className={({ isActive }) => (isActive ? "active" : "")}
+            >
+              {copy.nav.contact}
+            </NavLink>
+            <Link
+              className="language-switch"
+              to={switchPath}
+              lang={locale === "zh" ? "en" : "zh-CN"}
+              aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
+            >
+              {copy.nav.language}
+            </Link>
             <a
               className="nav-call"
               href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}
             >
-              <Icon name="phone" size={16} /> Call us
+              <Icon name="phone" size={16} /> {copy.nav.call}
             </a>
           </nav>
         </div>
@@ -103,17 +120,16 @@ export function PublicFooter({
 }: {
   settings?: SiteSettings;
 }) {
+  const { copy, path } = useLocale();
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
         <div>
           <Wordmark inverse />
-          <p className="footer-note">
-            A considered way to find your next car in Flushing.
-          </p>
+          <p className="footer-note">{copy.nav.footerNote}</p>
         </div>
         <div className="footer-contact">
-          <p className="eyebrow">Visit / call</p>
+          <p className="eyebrow">{copy.nav.visitCall}</p>
           <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}>
             {settings.phone}
           </a>
@@ -121,19 +137,20 @@ export function PublicFooter({
           <span>{settings.address}</span>
         </div>
         <div className="footer-links">
-          <p className="eyebrow">Explore</p>
-          <Link to="/inventory">Inventory</Link>
-          <Link to="/about">Our story</Link>
-          <Link to="/contact">Contact</Link>
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/terms">Terms</Link>
+          <p className="eyebrow">{copy.nav.explore}</p>
+          <Link to={path("/inventory")}>{copy.nav.inventory}</Link>
+          <Link to={path("/trade-sell")}>{copy.nav.trade}</Link>
+          <Link to={path("/about")}>{copy.nav.story}</Link>
+          <Link to={path("/contact")}>{copy.nav.contact}</Link>
+          <Link to={path("/privacy")}>{copy.nav.privacy}</Link>
+          <Link to={path("/terms")}>{copy.nav.terms}</Link>
         </div>
       </div>
       <div className="container footer-bottom">
         <span>
           © {new Date().getFullYear()} {settings.businessName}
         </span>
-        <span>Built for the road ahead.</span>
+        <span>{copy.nav.roadAhead}</span>
       </div>
     </footer>
   );

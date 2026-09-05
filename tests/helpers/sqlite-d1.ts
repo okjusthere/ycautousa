@@ -9,13 +9,20 @@ export class SqliteD1 implements D1Like {
   readonly sqlite: DatabaseSync;
   constructor() {
     this.sqlite = new DatabaseSync(":memory:");
-    const migration = readFileSync(
-      resolve(
-        new URL("../../migrations/0001_initial.sql", import.meta.url).pathname,
-      ),
-      "utf8",
-    );
-    this.sqlite.exec(migration);
+    for (const name of [
+      "0001_initial.sql",
+      "0002_confirmed_business_details.sql",
+      "0003_disable_sms_number.sql",
+      "0004_trade_sell_and_localization.sql",
+    ])
+      this.sqlite.exec(
+        readFileSync(
+          resolve(
+            new URL(`../../migrations/${name}`, import.meta.url).pathname,
+          ),
+          "utf8",
+        ),
+      );
   }
   prepare(sql: string): D1Statement {
     let statement: Statement | null = null;

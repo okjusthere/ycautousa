@@ -93,8 +93,62 @@ test.describe("public showroom", () => {
     ).toBeVisible();
   });
 
+  test("Trade/Sell accepts vehicle details and shares the store map", async ({
+    page,
+  }) => {
+    await page.goto("/trade-sell");
+    await expect(
+      page.getByRole("heading", { name: /Your car may be/i }),
+    ).toBeVisible();
+    await page.getByLabel("Name *").fill("Wei Seller");
+    await page.getByLabel(/VIN \/ Chassis number/i).fill("1HGCM82633A004352");
+    await page.getByLabel("Mileage *").fill("52300");
+    await page.getByLabel("WeChat").fill("wei-cars");
+    await page.getByRole("button", { name: /Send vehicle details/i }).click();
+    await expect(
+      page.getByRole("heading", { name: /Trade\/Sell request received/i }),
+    ).toBeVisible();
+    await expect(page.locator(".location-map iframe")).toHaveAttribute(
+      "src",
+      /google\.com\/maps/,
+    );
+  });
+
+  test("language switch keeps the equivalent page and Chinese copy", async ({
+    page,
+  }) => {
+    await page.goto("/inventory?make=Toyota");
+    if (await page.getByRole("button", { name: "Open menu" }).isVisible())
+      await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("link", { name: "切换到中文" }).click();
+    await expect(page).toHaveURL(/\/zh\/inventory\?make=Toyota$/);
+    await expect(page.getByText("在售车辆 / 实时库存")).toBeVisible();
+    if (await page.locator(".filter-trigger").isVisible())
+      await page.locator(".filter-trigger").click();
+    await expect(page.getByLabel("品牌")).toBeVisible();
+    await expect(page.getByLabel("型号")).toHaveCount(0);
+    if (await page.locator(".filter-done").isVisible())
+      await page.locator(".filter-done").click();
+    if (await page.getByRole("button", { name: "打开菜单" }).isVisible())
+      await page.getByRole("button", { name: "打开菜单" }).click();
+    await page.getByRole("link", { name: "Switch to English" }).click();
+    await expect(page).toHaveURL(/\/inventory\?make=Toyota$/);
+  });
+
+  test("contact page includes the store map", async ({ page }) => {
+    await page.goto("/contact");
+    await expect(page.locator(".location-map iframe")).toHaveAttribute(
+      "src",
+      /google\.com\/maps/,
+    );
+    await expect(
+      page.getByRole("link", { name: /Get directions/i }),
+    ).toHaveAttribute("href", /google\.com\/maps\/dir/);
+  });
+
   test("keeps the business phone voice-only", async ({ page }) => {
-    await page.goto("/inventory/2022-toyota-rav4-xle-local");
+    await page.goto("/inventory");
+    await page.locator(".vehicle-card h3 a").first().click();
     await expect(
       page.getByRole("link", { name: /Call about this car/i }),
     ).toHaveAttribute("href", "tel:7187990606");

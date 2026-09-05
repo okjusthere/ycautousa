@@ -1,8 +1,12 @@
 import { Link } from "react-router-dom";
 import type { Vehicle } from "../lib/types";
 import { demoImage } from "../src/demo";
-import { formatMileage, formatPrice } from "../lib/utils";
 import { Icon } from "./Icon";
+import {
+  formatLocalizedMileage,
+  formatLocalizedPrice,
+  useLocale,
+} from "../src/i18n";
 
 export function vehicleImage(vehicle: Vehicle): string {
   const cover =
@@ -13,17 +17,18 @@ export function vehicleImage(vehicle: Vehicle): string {
 }
 
 export function StatusPill({ status }: { status: Vehicle["status"] }) {
+  const { copy } = useLocale();
   return (
     <span className={`status-pill status-pill--${status}`}>
       {status === "available"
-        ? "Available"
+        ? copy.common.available
         : status === "pending"
-          ? "Pending"
+          ? copy.common.pending
           : status === "sold"
-            ? "Sold"
+            ? copy.common.sold
             : status === "hidden"
-              ? "Hidden"
-              : "Draft"}
+              ? copy.common.hidden
+              : copy.common.draft}
     </span>
   );
 }
@@ -35,14 +40,13 @@ export function VehicleCard({
   vehicle: Vehicle;
   admin?: boolean;
 }) {
+  const { copy, locale, path } = useLocale();
+  const destination = admin
+    ? `/admin/vehicles/${vehicle.id}`
+    : path(`/inventory/${vehicle.slug}`);
   return (
     <article className={`vehicle-card ${admin ? "vehicle-card--admin" : ""}`}>
-      <Link
-        to={
-          admin ? `/admin/vehicles/${vehicle.id}` : `/inventory/${vehicle.slug}`
-        }
-        className="vehicle-card-media"
-      >
+      <Link to={destination} className="vehicle-card-media">
         <img
           src={vehicleImage(vehicle)}
           alt={vehicle.title}
@@ -52,7 +56,7 @@ export function VehicleCard({
           height="640"
         />
         <span className="vehicle-card-index">
-          {vehicle.year ?? "—"} / {vehicle.bodyType ?? "Vehicle"}
+          {vehicle.year ?? "—"} / {vehicle.bodyType ?? copy.common.vehicle}
         </span>
         {vehicle.status !== "available" && (
           <StatusPill status={vehicle.status} />
@@ -62,19 +66,11 @@ export function VehicleCard({
         <div className="vehicle-card-top">
           <div>
             <p className="vehicle-card-make">
-              {vehicle.make ?? "Pre-owned"}
+              {vehicle.make ?? copy.common.preowned}
               {vehicle.trim ? ` · ${vehicle.trim}` : ""}
             </p>
             <h3>
-              <Link
-                to={
-                  admin
-                    ? `/admin/vehicles/${vehicle.id}`
-                    : `/inventory/${vehicle.slug}`
-                }
-              >
-                {vehicle.title}
-              </Link>
+              <Link to={destination}>{vehicle.title}</Link>
             </h3>
           </div>
           <span className="vehicle-card-arrow">
@@ -82,8 +78,8 @@ export function VehicleCard({
           </span>
         </div>
         <div className="vehicle-card-meta">
-          <strong>{formatPrice(vehicle.priceCents)}</strong>
-          <span>{formatMileage(vehicle.mileage)}</span>
+          <strong>{formatLocalizedPrice(vehicle.priceCents, locale)}</strong>
+          <span>{formatLocalizedMileage(vehicle.mileage, locale)}</span>
         </div>
       </div>
     </article>

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isAdminRequest, verifyAccessJwt } from "../../workers/security";
+import {
+  isAdminRequest,
+  securityHeaders,
+  verifyAccessJwt,
+} from "../../workers/security";
 import type { Env } from "../../workers/env";
 
 function base64Url(value: string | Uint8Array): string {
@@ -60,6 +64,16 @@ function productionEnv(teamDomain: string): Env {
 }
 
 describe("Cloudflare Access JWT verification", () => {
+  it("allows only the configured verification and map frame providers", () => {
+    const response = securityHeaders(
+      new Response("ok"),
+      productionEnv("https://yc-auto-test.cloudflareaccess.com"),
+    );
+    const policy = response.headers.get("content-security-policy") ?? "";
+    expect(policy).toContain("https://challenges.cloudflare.com");
+    expect(policy).toContain("https://www.google.com");
+    expect(policy).not.toContain("frame-src *");
+  });
   it("accepts a signed token with the pinned issuer and audience", async () => {
     const { keyPair, jwk } = await accessKeyFixture();
     const teamDomain = "https://yc-auto-test.cloudflareaccess.com";

@@ -54,22 +54,54 @@ export const leadInputSchema = z
   .object({
     vehicleId: z.string().trim().max(80).nullable().optional(),
     leadType: z
-      .enum(["availability", "test_drive", "contact"])
+      .enum(["availability", "test_drive", "contact", "trade_sell"])
       .default("contact"),
     name: z.string().trim().min(2).max(100),
     phone: z.string().trim().max(40).nullable().optional(),
     email: z.string().trim().email().max(254).nullable().optional(),
-    preferredContact: z.enum(["phone", "email"]).default("phone"),
+    preferredContact: z.enum(["phone", "email", "wechat"]).default("phone"),
     message: z.string().trim().max(3000).nullable().optional(),
+    vin: vinSchema.nullable().optional(),
+    mileage: z.preprocess(
+      (value) =>
+        value === "" || value === null || value === undefined
+          ? null
+          : Number(value),
+      z.number().int().min(0).max(2_000_000).nullable(),
+    ),
+    wechat: z.string().trim().max(100).nullable().optional(),
     sourceUrl: z.string().url().max(2000).nullable().optional(),
     referrer: z.string().url().max(2000).nullable().optional(),
     utm: z.record(z.string().max(100)).optional().default({}),
     turnstileToken: z.string().trim().min(1).max(4096),
     honeypot: z.string().max(200).optional().default(""),
   })
-  .refine((value) => Boolean(value.phone || value.email), {
-    message: "Phone or email is required",
-    path: ["phone"],
+  .superRefine((value, context) => {
+    const contactProvided =
+      value.leadType === "trade_sell"
+        ? Boolean(value.phone || value.email || value.wechat)
+        : Boolean(value.phone || value.email);
+    if (!contactProvided)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          value.leadType === "trade_sell"
+            ? "Phone, email, or WeChat is required"
+            : "Phone or email is required",
+        path: ["phone"],
+      });
+    if (value.leadType === "trade_sell" && value.vin?.length !== 17)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "VIN must be exactly 17 characters",
+        path: ["vin"],
+      });
+    if (value.leadType === "trade_sell" && value.mileage === null)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Mileage is required",
+        path: ["mileage"],
+      });
   });
 
 export const leadUpdateSchema = z.object({
@@ -87,11 +119,17 @@ export const settingsSchema = z.object({
   businessHours: z.string().trim().max(300),
   heroTitle: z.string().trim().min(1).max(160),
   heroSubtitle: z.string().trim().min(1).max(300),
+  heroTitleZh: z.string().trim().max(160).nullable().optional(),
+  heroSubtitleZh: z.string().trim().max(300).nullable().optional(),
   aboutText: z.string().trim().max(5000),
+  aboutTextZh: z.string().trim().max(5000).nullable().optional(),
   whyChooseText: z.string().trim().max(3000),
+  whyChooseTextZh: z.string().trim().max(3000).nullable().optional(),
   leadNotificationRecipient: z.string().email().max(254),
   seoTitle: z.string().trim().max(180),
   seoDescription: z.string().trim().max(320),
+  seoTitleZh: z.string().trim().max(180).nullable().optional(),
+  seoDescriptionZh: z.string().trim().max(320).nullable().optional(),
   whatsappNumber: z.string().trim().max(40).nullable().optional(),
   logoKey: z.string().trim().max(300).nullable().optional(),
   faviconKey: z.string().trim().max(300).nullable().optional(),

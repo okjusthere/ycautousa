@@ -33,4 +33,37 @@ describe("validation and normalization", () => {
       }).success,
     ).toBe(true);
   });
+  it("validates Trade/Sell vehicle details and accepts any one contact method", () => {
+    expect(
+      leadInputSchema.safeParse({
+        leadType: "trade_sell",
+        name: "Wei Seller",
+        vin: "1HGCM82633A004352",
+        mileage: "52,300",
+        wechat: "wei-cars",
+        turnstileToken: "x",
+      }).success,
+    ).toBe(false);
+    expect(
+      leadInputSchema.safeParse({
+        leadType: "trade_sell",
+        name: "Wei Seller",
+        vin: "1HGCM82633A004352",
+        mileage: "52300",
+        wechat: "wei-cars",
+        preferredContact: "wechat",
+        turnstileToken: "x",
+      }).success,
+    ).toBe(true);
+    expect(
+      leadInputSchema.safeParse({
+        leadType: "trade_sell",
+        name: "Wei Seller",
+        vin: "SHORT",
+        mileage: "52300",
+        phone: "718-555-0101",
+        turnstileToken: "x",
+      }).success,
+    ).toBe(false);
+  });
 });

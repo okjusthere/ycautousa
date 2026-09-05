@@ -13,8 +13,14 @@ if (!origin) {
 const checks = [
   "/",
   "/inventory",
+  "/trade-sell",
   "/about",
   "/contact",
+  "/zh",
+  "/zh/inventory",
+  "/zh/trade-sell",
+  "/zh/contact",
+  "/api/inventory/facets",
   "/sitemap.xml",
   "/robots.txt",
 ];
@@ -46,11 +52,23 @@ if (origin) {
       sitemap.ok = false;
       sitemap.status = "invalid sitemap XML";
     }
+    if (
+      !xml.includes("/trade-sell") ||
+      !xml.includes("/zh/trade-sell") ||
+      !xml.includes('hreflang="zh-CN"')
+    ) {
+      sitemap.ok = false;
+      sitemap.status = "localized routes missing from sitemap";
+    }
     const vehiclePaths = [
-      ...xml.matchAll(/<loc>[^<]*\/inventory\/([^<]+)<\/loc>/g),
-    ]
-      .slice(0, 5)
-      .map((match) => `/inventory/${match[1]}`);
+      ...new Set(
+        [
+          ...xml.matchAll(
+            /<loc>https?:\/\/[^/]+(\/(?:zh\/)?inventory\/[^<]+)<\/loc>/g,
+          ),
+        ].map((match) => match[1]),
+      ),
+    ].slice(0, 6);
     for (const path of vehiclePaths) {
       try {
         const response = await fetch(`${origin}${path}`);

@@ -14,6 +14,14 @@ export async function sendLeadNotification(
   const vehicleLine = lead.vehicle
     ? `${lead.vehicle.title} (${lead.vehicle.slug})`
     : "General contact";
+  const tradeDetails =
+    lead.leadType === "trade_sell"
+      ? [
+          `VIN: ${lead.details.vin ?? "—"}`,
+          `Mileage: ${lead.details.mileage?.toLocaleString("en-US") ?? "—"} mi`,
+          `WeChat: ${lead.details.wechat ?? "—"}`,
+        ]
+      : [];
   const text = [
     "New YC Auto lead",
     `Type: ${lead.leadType}`,
@@ -23,6 +31,7 @@ export async function sendLeadNotification(
     `Email: ${lead.email ?? "—"}`,
     `Preferred contact: ${lead.preferredContact ?? "—"}`,
     `Message: ${lead.message ?? "—"}`,
+    ...tradeDetails,
     `Source: ${lead.sourceUrl ?? "—"}`,
     `Admin: ${env.APP_ORIGIN ?? ""}/admin/leads/${lead.id}`,
   ].join("\n");
@@ -30,9 +39,9 @@ export async function sendLeadNotification(
     await binding.send({
       from,
       to,
-      subject: `New YC Auto lead${lead.vehicle ? ` — ${lead.vehicle.title}` : ""}`,
+      subject: `${lead.leadType === "trade_sell" ? "New Trade/Sell request" : "New YC Auto lead"}${lead.vehicle ? ` — ${lead.vehicle.title}` : ""}`,
       text,
-      html: `<h2>New YC Auto lead</h2><p><strong>Type:</strong> ${escapeHtml(lead.leadType)}</p><p><strong>Vehicle:</strong> ${escapeHtml(vehicleLine)}</p><p><strong>Name:</strong> ${escapeHtml(lead.name)}</p><p><strong>Phone:</strong> ${escapeHtml(lead.phone ?? "—")}</p><p><strong>Email:</strong> ${escapeHtml(lead.email ?? "—")}</p><p><strong>Preferred contact:</strong> ${escapeHtml(lead.preferredContact ?? "—")}</p><p><strong>Message:</strong> ${escapeHtml(lead.message ?? "—")}</p><p><strong>Source:</strong> ${escapeHtml(lead.sourceUrl ?? "—")}</p><p><a href="${escapeHtml(env.APP_ORIGIN ?? "")}/admin/leads/${encodeURIComponent(lead.id)}">Open lead in admin</a></p>`,
+      html: `<h2>${lead.leadType === "trade_sell" ? "New Trade/Sell request" : "New YC Auto lead"}</h2><p><strong>Type:</strong> ${escapeHtml(lead.leadType)}</p><p><strong>Vehicle:</strong> ${escapeHtml(vehicleLine)}</p><p><strong>Name:</strong> ${escapeHtml(lead.name)}</p><p><strong>Phone:</strong> ${escapeHtml(lead.phone ?? "—")}</p><p><strong>Email:</strong> ${escapeHtml(lead.email ?? "—")}</p><p><strong>Preferred contact:</strong> ${escapeHtml(lead.preferredContact ?? "—")}</p>${lead.leadType === "trade_sell" ? `<p><strong>VIN:</strong> ${escapeHtml(lead.details.vin ?? "—")}</p><p><strong>Mileage:</strong> ${escapeHtml(lead.details.mileage?.toLocaleString("en-US") ?? "—")} mi</p><p><strong>WeChat:</strong> ${escapeHtml(lead.details.wechat ?? "—")}</p>` : ""}<p><strong>Message:</strong> ${escapeHtml(lead.message ?? "—")}</p><p><strong>Source:</strong> ${escapeHtml(lead.sourceUrl ?? "—")}</p><p><a href="${escapeHtml(env.APP_ORIGIN ?? "")}/admin/leads/${encodeURIComponent(lead.id)}">Open lead in admin</a></p>`,
     });
     return "sent";
   } catch (error) {

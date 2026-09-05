@@ -69,6 +69,75 @@ describe("Worker API integration", () => {
     expect(denied.status).toBe(401);
   });
 
+  it("returns facets from available inventory only", async () => {
+    for (const vehicle of [
+      {
+        title: "Available Toyota",
+        status: "available",
+        make: "Toyota",
+        year: 2022,
+      },
+      { title: "Pending BMW", status: "pending", make: "BMW", year: 2021 },
+      {
+        title: "Available Honda",
+        status: "available",
+        make: "Honda",
+        year: 2020,
+      },
+    ])
+      await handleRequest(
+        new Request("http://localhost:5173/api/admin/vehicles", {
+          method: "POST",
+          headers: adminHeaders,
+          body: JSON.stringify({ ...vehicle, featured: false, features: [] }),
+        }),
+        env,
+      );
+    const response = await handleRequest(
+      new Request("http://localhost:5173/api/inventory/facets"),
+      env,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      makes: [
+        { make: "Honda", count: 1 },
+        { make: "Toyota", count: 1 },
+      ],
+      years: [2022, 2020],
+    });
+  });
+
+  it("stores validated Trade/Sell details as structured lead data", async () => {
+    const response = await handleRequest(
+      new Request("http://localhost:5173/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadType: "trade_sell",
+          name: "Wei Seller",
+          vin: "1HGCM82633A004352",
+          mileage: 52300,
+          wechat: "wei-cars",
+          preferredContact: "wechat",
+          turnstileToken: "test-token",
+        }),
+      }),
+      env,
+      undefined,
+      { turnstileImpl: async () => ({ success: true }) },
+    );
+    expect(response.status).toBe(200);
+    const row = await env.DB.prepare(
+      "SELECT lead_type,details_json FROM leads LIMIT 1",
+    ).first<{ lead_type: string; details_json: string }>();
+    expect(row?.lead_type).toBe("trade_sell");
+    expect(JSON.parse(row?.details_json ?? "{}")).toEqual({
+      vin: "1HGCM82633A004352",
+      mileage: 52300,
+      wechat: "wei-cars",
+    });
+  });
+
   it("soft deletes a vehicle from public and admin inventory", async () => {
     const create = await handleRequest(
       new Request("http://localhost:5173/api/admin/vehicles", {
@@ -334,6 +403,19 @@ describe("Worker API integration", () => {
     expect(response.status).toBe(200);
   });
 
+  it("decorates Chinese public pages with localized SEO and alternates", async () => {
+    const response = await handleRequest(
+      new Request("http://localhost:5173/zh/contact"),
+      env,
+    );
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('<html lang="zh-CN"');
+    expect(html).toContain("<title>联系我们｜YC Auto USA</title>");
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+  });
+
   it("redirects a non-canonical hostname to the configured origin", async () => {
     const productionEnv: Env = {
       ...env,
@@ -391,6 +473,10 @@ describe("Worker API integration", () => {
     );
     const xml = await sitemap.text();
     expect(xml).toContain(`/inventory/${sold?.slug}`);
+    expect(xml).toContain(`/zh/inventory/${sold?.slug}`);
+    expect(xml).toContain("/trade-sell");
+    expect(xml).toContain("/zh/trade-sell");
+    expect(xml).toContain('hreflang="zh-CN"');
     expect(xml).not.toContain(`/inventory/${draft?.slug}`);
   });
 });

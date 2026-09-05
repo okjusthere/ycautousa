@@ -72,6 +72,11 @@ export type Lead = {
   email: string | null;
   preferredContact: string | null;
   message: string | null;
+  details: {
+    vin?: string;
+    mileage?: number;
+    wechat?: string;
+  };
   status: LeadStatus;
   sourceUrl: string | null;
   referrer: string | null;
@@ -95,11 +100,17 @@ export type SiteSettings = {
   businessHours: string;
   heroTitle: string;
   heroSubtitle: string;
+  heroTitleZh: string | null;
+  heroSubtitleZh: string | null;
   aboutText: string;
+  aboutTextZh: string | null;
   whyChooseText: string;
+  whyChooseTextZh: string | null;
   leadNotificationRecipient: string;
   seoTitle: string;
   seoDescription: string;
+  seoTitleZh: string | null;
+  seoDescriptionZh: string | null;
   whatsappNumber: string | null;
   logoKey: string | null;
   faviconKey: string | null;
@@ -136,6 +147,11 @@ export type InventoryFilters = {
   sort?: "newest" | "price_asc" | "price_desc" | "mileage_asc" | "year_desc";
   page?: number;
   perPage?: number;
+};
+
+export type InventoryFacets = {
+  makes: Array<{ make: string; count: number }>;
+  years: number[];
 };
 
 export type DashboardStats = {

@@ -14,14 +14,23 @@ export const demoSettings: SiteSettings = {
   businessHours: "Mon–Fri 10:00 AM–6:00 PM · Sat–Sun 12:00 PM–5:00 PM",
   heroTitle: "Find Your Next Car",
   heroSubtitle: "Quality pre-owned vehicles in Flushing, New York.",
+  heroTitleZh: "找到你的下一辆车",
+  heroSubtitleZh: "纽约法拉盛优质二手车，信息透明，选车更轻松。",
   aboutText:
     "YC Auto USA is a neighborhood pre-owned vehicle dealer serving drivers in Flushing and the surrounding New York area. Browse our current inventory online, then call or send a note to arrange a visit.",
+  aboutTextZh:
+    "YC Auto USA 是一家位于纽约法拉盛的社区二手车行，为法拉盛及纽约周边地区的驾驶者服务。您可以先在线浏览当前库存，再致电或留言预约到店。",
   whyChooseText:
     "Straightforward inventory, clear details, and a local team ready to help you choose with confidence.",
+  whyChooseTextZh:
+    "实时库存、清晰车辆信息，以及随时为您提供帮助的本地团队，让选车更简单、更安心。",
   leadNotificationRecipient: "sophie@youxuancars.com",
   seoTitle: "YC Auto USA | Quality pre-owned vehicles in Flushing, NY",
   seoDescription:
     "Browse quality pre-owned cars, SUVs, and trucks from YC Auto USA in Flushing, New York.",
+  seoTitleZh: "YC Auto USA 优选汽车｜纽约法拉盛二手车",
+  seoDescriptionZh:
+    "浏览 YC Auto USA 在纽约法拉盛提供的优质二手轿车、SUV 和卡车库存。",
   whatsappNumber: null,
   logoKey: null,
   faviconKey: null,

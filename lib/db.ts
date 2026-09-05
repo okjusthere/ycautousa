@@ -9,6 +9,7 @@ import type {
   Vehicle,
   VehicleImage,
   VehicleStatus,
+  InventoryFacets,
 } from "./types";
 import { nowIso, uid } from "./utils";
 
@@ -105,6 +106,7 @@ export function rowToImage(row: ImageRow): VehicleImage {
 
 export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
   let utm: Record<string, string> = {};
+  let details: Lead["details"] = {};
   try {
     const parsed = JSON.parse(String(row.utm_json ?? "{}"));
     if (parsed && typeof parsed === "object")
@@ -116,6 +118,23 @@ export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
   } catch {
     utm = {};
   }
+  try {
+    const parsed = JSON.parse(String(row.details_json ?? "{}"));
+    if (parsed && typeof parsed === "object") {
+      const candidate = parsed as Record<string, unknown>;
+      details = {
+        ...(typeof candidate.vin === "string" ? { vin: candidate.vin } : {}),
+        ...(typeof candidate.mileage === "number"
+          ? { mileage: candidate.mileage }
+          : {}),
+        ...(typeof candidate.wechat === "string"
+          ? { wechat: candidate.wechat }
+          : {}),
+      };
+    }
+  } catch {
+    details = {};
+  }
   return {
     id: String(row.id),
     vehicleId: nullable(row.vehicle_id),
@@ -125,6 +144,7 @@ export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
     email: nullable(row.email),
     preferredContact: nullable(row.preferred_contact),
     message: nullable(row.message),
+    details,
     status: String(row.status) as LeadStatus,
     sourceUrl: nullable(row.source_url),
     referrer: nullable(row.referrer),
@@ -150,11 +170,17 @@ export function rowToSettings(row: Record<string, unknown>): SiteSettings {
     businessHours: String(row.business_hours ?? ""),
     heroTitle: String(row.hero_title ?? ""),
     heroSubtitle: String(row.hero_subtitle ?? ""),
+    heroTitleZh: nullable(row.hero_title_zh),
+    heroSubtitleZh: nullable(row.hero_subtitle_zh),
     aboutText: String(row.about_text ?? ""),
+    aboutTextZh: nullable(row.about_text_zh),
     whyChooseText: String(row.why_choose_text ?? ""),
+    whyChooseTextZh: nullable(row.why_choose_text_zh),
     leadNotificationRecipient: String(row.lead_notification_recipient ?? ""),
     seoTitle: String(row.seo_title ?? ""),
     seoDescription: String(row.seo_description ?? ""),
+    seoTitleZh: nullable(row.seo_title_zh),
+    seoDescriptionZh: nullable(row.seo_description_zh),
     whatsappNumber: nullable(row.whatsapp_number),
     logoKey: nullable(row.logo_key),
     faviconKey: nullable(row.favicon_key),
@@ -330,6 +356,25 @@ export async function listMakes(
     )
     .all<{ make: string; count: number }>();
   return results.map((row) => ({ make: row.make, count: Number(row.count) }));
+}
+
+export async function listInventoryFacets(
+  db: D1Like,
+): Promise<InventoryFacets> {
+  const [makes, yearRows] = await Promise.all([
+    listMakes(db),
+    db
+      .prepare(
+        "SELECT DISTINCT year FROM vehicles WHERE status = 'available' AND deleted_at IS NULL AND year IS NOT NULL ORDER BY year DESC",
+      )
+      .all<{ year: number }>(),
+  ]);
+  return {
+    makes,
+    years: yearRows.results
+      .map((row) => Number(row.year))
+      .filter((year) => Number.isInteger(year)),
+  };
 }
 
 export async function listAdminVehicles(
@@ -668,6 +713,7 @@ export async function insertLead(
     email?: string | null;
     preferredContact?: string | null;
     message?: string | null;
+    details?: Lead["details"];
     sourceUrl?: string | null;
     referrer?: string | null;
     utm?: Record<string, string>;
@@ -679,7 +725,7 @@ export async function insertLead(
   const at = nowIso();
   await db
     .prepare(
-      "INSERT INTO leads (id,vehicle_id,lead_type,name,phone,email,preferred_contact,message,status,source_url,referrer,utm_json,cf_country,ip_hash,created_at,updated_at,email_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO leads (id,vehicle_id,lead_type,name,phone,email,preferred_contact,message,details_json,status,source_url,referrer,utm_json,cf_country,ip_hash,created_at,updated_at,email_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     )
     .bind(
       id,
@@ -690,6 +736,7 @@ export async function insertLead(
       lead.email ?? null,
       lead.preferredContact ?? null,
       lead.message ?? null,
+      JSON.stringify(lead.details ?? {}),
       "new",
       lead.sourceUrl ?? null,
       lead.referrer ?? null,
@@ -899,7 +946,7 @@ export async function updateSettings(
 ): Promise<void> {
   await db
     .prepare(
-      "UPDATE site_settings SET business_name=?,short_name=?,phone=?,sms_number=?,email=?,address=?,business_hours=?,hero_title=?,hero_subtitle=?,about_text=?,why_choose_text=?,lead_notification_recipient=?,seo_title=?,seo_description=?,whatsapp_number=?,logo_key=?,favicon_key=?,updated_at=? WHERE id=1",
+      "UPDATE site_settings SET business_name=?,short_name=?,phone=?,sms_number=?,email=?,address=?,business_hours=?,hero_title=?,hero_subtitle=?,hero_title_zh=?,hero_subtitle_zh=?,about_text=?,about_text_zh=?,why_choose_text=?,why_choose_text_zh=?,lead_notification_recipient=?,seo_title=?,seo_description=?,seo_title_zh=?,seo_description_zh=?,whatsapp_number=?,logo_key=?,favicon_key=?,updated_at=? WHERE id=1",
     )
     .bind(
       settings.businessName,
@@ -911,11 +958,17 @@ export async function updateSettings(
       settings.businessHours,
       settings.heroTitle,
       settings.heroSubtitle,
+      settings.heroTitleZh,
+      settings.heroSubtitleZh,
       settings.aboutText,
+      settings.aboutTextZh,
       settings.whyChooseText,
+      settings.whyChooseTextZh,
       settings.leadNotificationRecipient,
       settings.seoTitle,
       settings.seoDescription,
+      settings.seoTitleZh,
+      settings.seoDescriptionZh,
       settings.whatsappNumber,
       settings.logoKey,
       settings.faviconKey,

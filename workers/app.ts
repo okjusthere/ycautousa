@@ -13,6 +13,7 @@ import {
   listAudit,
   listFeaturedVehicles,
   listImages,
+  listInventoryFacets,
   listLeads,
   listMakes,
   listPublicVehicles,
@@ -231,6 +232,8 @@ async function publicApi(
     });
     return json(result);
   }
+  if (path === "/api/inventory/facets" && request.method === "GET")
+    return json(await listInventoryFacets(env.DB));
   const vehicleMatch = path.match(/^\/api\/vehicles\/([^/]+)$/);
   if (vehicleMatch && request.method === "GET") {
     const vehicle = await getVehicleBySlug(
@@ -331,8 +334,23 @@ async function submitLead(
     name: parsed.data.name,
     phone: parsed.data.phone ?? null,
     email: parsed.data.email ?? null,
-    preferredContact: parsed.data.preferredContact,
+    preferredContact:
+      parsed.data.leadType === "trade_sell"
+        ? parsed.data.phone
+          ? "phone"
+          : parsed.data.email
+            ? "email"
+            : "wechat"
+        : parsed.data.preferredContact,
     message: parsed.data.message ?? null,
+    details:
+      parsed.data.leadType === "trade_sell"
+        ? {
+            vin: parsed.data.vin ?? undefined,
+            mileage: parsed.data.mileage ?? undefined,
+            wechat: parsed.data.wechat ?? undefined,
+          }
+        : {},
     sourceUrl: parsed.data.sourceUrl ?? request.url,
     referrer: parsed.data.referrer ?? request.headers.get("Referer"),
     utm: parsed.data.utm,
@@ -734,9 +752,10 @@ function sitemapXml(
   origin: string,
   vehicles: Array<{ slug: string; updatedAt: string }>,
 ): string {
-  const urls = [
+  const paths = [
     "",
     "/inventory",
+    "/trade-sell",
     "/about",
     "/contact",
     "/privacy",
@@ -745,13 +764,28 @@ function sitemapXml(
       (vehicle) => `/inventory/${encodeURIComponent(vehicle.slug)}`,
     ),
   ];
-  const entries = urls
-    .map(
-      (path) =>
-        `<url><loc>${escapeHtml(`${origin}${path}`)}</loc>${path.startsWith("/inventory/") ? `<lastmod>${escapeHtml(new Date(vehicles.find((vehicle) => `/inventory/${vehicle.slug}` === path)?.updatedAt ?? nowIso()).toISOString())}</lastmod>` : ""}</url>`,
-    )
+  const entries = paths
+    .flatMap((path) => {
+      const englishUrl = `${origin}${path}`;
+      const chineseUrl = `${origin}/zh${path || ""}`;
+      const lastmod = path.startsWith("/inventory/")
+        ? `<lastmod>${escapeHtml(
+            new Date(
+              vehicles.find(
+                (vehicle) =>
+                  `/inventory/${encodeURIComponent(vehicle.slug)}` === path,
+              )?.updatedAt ?? nowIso(),
+            ).toISOString(),
+          )}</lastmod>`
+        : "";
+      const alternates = `<xhtml:link rel="alternate" hreflang="en" href="${escapeHtml(englishUrl)}"/><xhtml:link rel="alternate" hreflang="zh-CN" href="${escapeHtml(chineseUrl)}"/><xhtml:link rel="alternate" hreflang="x-default" href="${escapeHtml(englishUrl)}"/>`;
+      return [
+        `<url><loc>${escapeHtml(englishUrl)}</loc>${alternates}${lastmod}</url>`,
+        `<url><loc>${escapeHtml(chineseUrl)}</loc>${alternates}${lastmod}</url>`,
+      ];
+    })
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries}</urlset>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${entries}</urlset>`;
 }
 
 async function staticOrShell(request: Request, env: Env): Promise<Response> {
@@ -787,17 +821,33 @@ async function decoratePublicHtml(
     return response;
   const url = new URL(request.url);
   const origin = env.APP_ORIGIN ?? url.origin;
-  let title = "YC Auto USA | Quality pre-owned vehicles";
-  let description = "Quality pre-owned vehicles in Flushing, New York.";
-  let snippet = "Find your next car at YC Auto USA in Flushing, New York.";
+  const isZh = url.pathname === "/zh" || url.pathname.startsWith("/zh/");
+  const publicPath = isZh
+    ? url.pathname === "/zh"
+      ? "/"
+      : url.pathname.slice(3) || "/"
+    : url.pathname;
+  let title = isZh
+    ? "YC Auto USA 优选汽车｜纽约法拉盛二手车"
+    : "YC Auto USA | Quality pre-owned vehicles";
+  let description = isZh
+    ? "浏览 YC Auto USA 在纽约法拉盛提供的优质二手车。"
+    : "Quality pre-owned vehicles in Flushing, New York.";
+  let snippet = isZh
+    ? "在纽约法拉盛找到你的下一辆车。"
+    : "Find your next car at YC Auto USA in Flushing, New York.";
   let socialImage = `${origin}/brand/team.jpg`;
   let structured: Record<string, unknown> | null = null;
-  if (url.pathname === "/") {
+  if (publicPath === "/") {
     try {
       const settings = await getSettings(env.DB);
-      title = settings.seoTitle;
-      description = settings.seoDescription;
-      snippet = `${settings.heroTitle}. ${settings.heroSubtitle}`;
+      title = isZh ? settings.seoTitleZh || title : settings.seoTitle;
+      description = isZh
+        ? settings.seoDescriptionZh || description
+        : settings.seoDescription;
+      snippet = isZh
+        ? `${settings.heroTitleZh || "找到你的下一辆车"}。${settings.heroSubtitleZh || description}`
+        : `${settings.heroTitle}. ${settings.heroSubtitle}`;
       structured = {
         "@context": "https://schema.org",
         "@type": "AutoDealer",
@@ -812,31 +862,52 @@ async function decoratePublicHtml(
     } catch {
       /* static shell remains useful while D1 is being configured */
     }
-  } else if (url.pathname === "/inventory") {
-    title = "Inventory | YC Auto USA";
-    description =
-      "Browse current pre-owned vehicles at YC Auto USA in Flushing, New York.";
+  } else if (publicPath === "/inventory") {
+    title = isZh ? "在售车辆｜YC Auto USA" : "Inventory | YC Auto USA";
+    description = isZh
+      ? "浏览 YC Auto USA 位于纽约法拉盛的当前二手车库存。"
+      : "Browse current pre-owned vehicles at YC Auto USA in Flushing, New York.";
+    snippet = isZh
+      ? "按品牌、价格、里程和车身类型浏览当前库存。"
+      : "Browse current vehicles, filter by make, price, mileage, and body type.";
+  } else if (publicPath === "/trade-sell") {
+    title = isZh
+      ? "置换或卖车｜YC Auto USA"
+      : "Trade or Sell Your Car | YC Auto USA";
+    description = isZh
+      ? "向 YC Auto USA 提交车辆资料，咨询车辆置换或出售。"
+      : "Tell YC Auto USA about your current vehicle and request a trade or purchase conversation.";
+    snippet = isZh
+      ? "提交 VIN、里程和联系方式，开始车辆置换或出售咨询。"
+      : "Share your VIN, mileage, and contact details to start a Trade/Sell request.";
+  } else if (publicPath === "/about") {
+    title = isZh ? "关于我们｜YC Auto USA" : "Our story | YC Auto USA";
+    description = isZh
+      ? "了解位于纽约法拉盛的本地二手车行 YC Auto USA。"
+      : "Meet YC Auto USA, a local pre-owned vehicle dealer in Flushing, New York.";
+    snippet = isZh
+      ? "熟悉本地，认真选车。"
+      : "Local knowledge. Good cars. A straightforward place to find your next vehicle.";
+  } else if (publicPath === "/contact") {
+    title = isZh ? "联系我们｜YC Auto USA" : "Contact | YC Auto USA";
+    description = isZh
+      ? "致电、发送邮件或留言联系纽约法拉盛 YC Auto USA。"
+      : "Call, email, or send a message to YC Auto USA in Flushing, New York.";
+    snippet = isZh
+      ? "欢迎致电、发送邮件或留言联系 YC Auto USA。"
+      : "Let’s talk cars. Call, email, or send a note to YC Auto USA.";
+  } else if (publicPath === "/privacy" || publicPath === "/terms") {
+    title = `${publicPath === "/privacy" ? (isZh ? "隐私政策" : "Privacy") : isZh ? "使用条款" : "Terms"} | YC Auto USA`;
     snippet =
-      "Browse current vehicles, filter by make, price, mileage, and body type.";
-  } else if (url.pathname === "/about") {
-    title = "Our story | YC Auto USA";
-    description =
-      "Meet YC Auto USA, a local pre-owned vehicle dealer in Flushing, New York.";
-    snippet =
-      "Local knowledge. Good cars. A straightforward place to find your next vehicle.";
-  } else if (url.pathname === "/contact") {
-    title = "Contact | YC Auto USA";
-    description =
-      "Call, email, or send a message to YC Auto USA in Flushing, New York.";
-    snippet = "Let’s talk cars. Call, email, or send a note to YC Auto USA.";
-  } else if (url.pathname === "/privacy" || url.pathname === "/terms") {
-    title = `${url.pathname === "/privacy" ? "Privacy" : "Terms"} | YC Auto USA`;
-    snippet =
-      url.pathname === "/privacy"
-        ? "How YC Auto USA handles contact information."
-        : "Terms for using the YC Auto USA website.";
+      publicPath === "/privacy"
+        ? isZh
+          ? "了解 YC Auto USA 如何处理客户提交的信息。"
+          : "How YC Auto USA handles contact information."
+        : isZh
+          ? "YC Auto USA 网站使用条款。"
+          : "Terms for using the YC Auto USA website.";
   } else {
-    const detailPath = url.pathname.match(/^\/inventory\/([^/]+)$/);
+    const detailPath = publicPath.match(/^\/inventory\/([^/]+)$/);
     if (detailPath) {
       const vehicle = await getVehicleBySlug(
         env.DB,
@@ -848,7 +919,7 @@ async function decoratePublicHtml(
         description =
           vehicle.description?.slice(0, 300) ||
           `${vehicle.title} at YC Auto USA in Flushing, New York.`;
-        snippet = `${vehicle.title}. ${vehicle.priceCents !== null ? formatPrice(vehicle.priceCents) : "Price on request"} · ${vehicle.mileage !== null ? formatMileage(vehicle.mileage) : "Mileage on request"}.`;
+        snippet = `${vehicle.title}. ${vehicle.priceCents !== null ? formatPrice(vehicle.priceCents) : isZh ? "价格请咨询" : "Price on request"} · ${vehicle.mileage !== null ? formatMileage(vehicle.mileage) : isZh ? "里程请咨询" : "Mileage on request"}.`;
         const cover =
           vehicle.images?.find((image) => image.isCover) ?? vehicle.images?.[0];
         if (cover?.r2Key)
@@ -886,9 +957,12 @@ async function decoratePublicHtml(
     env.ENVIRONMENT !== "production"
       ? '<meta name="robots" content="noindex,nofollow">'
       : '<meta name="robots" content="index,follow">';
-  const head = `${robots}<meta name="description" content="${escapeHtml(description)}"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(`${origin}${url.pathname}`)}"><meta property="og:image" content="${escapeHtml(socialImage)}"><link rel="canonical" href="${escapeHtml(`${origin}${url.pathname}`)}">${jsonLd}`;
+  const englishUrl = `${origin}${publicPath === "/" ? "" : publicPath}`;
+  const chineseUrl = `${origin}/zh${publicPath === "/" ? "" : publicPath}`;
+  const head = `${robots}<meta name="description" content="${escapeHtml(description)}"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(`${origin}${url.pathname}`)}"><meta property="og:image" content="${escapeHtml(socialImage)}"><link rel="canonical" href="${escapeHtml(`${origin}${url.pathname}`)}"><link rel="alternate" hreflang="en" href="${escapeHtml(englishUrl)}"><link rel="alternate" hreflang="zh-CN" href="${escapeHtml(chineseUrl)}"><link rel="alternate" hreflang="x-default" href="${escapeHtml(englishUrl)}">${jsonLd}`;
   const body = await response.text();
   const enhanced = body
+    .replace(/<html lang="[^"]*"/i, `<html lang="${isZh ? "zh-CN" : "en"}"`)
     .replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`)
     .replace(
       /<meta name="description"[^>]*>/i,
@@ -897,7 +971,7 @@ async function decoratePublicHtml(
     .replace("</head>", `${head}</head>`)
     .replace(
       '<div id="root"></div>',
-      `<div id="root"></div><noscript><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(snippet)}</p><p><a href="${escapeHtml(`${origin}/inventory`)}">Browse inventory</a></p></main></noscript>`,
+      `<div id="root"></div><noscript><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(snippet)}</p><p><a href="${escapeHtml(`${origin}${isZh ? "/zh/inventory" : "/inventory"}`)}">${isZh ? "浏览在售车辆" : "Browse inventory"}</a></p></main></noscript>`,
     );
   const headers = new Headers(response.headers);
   headers.set("Content-Type", "text/html; charset=utf-8");
@@ -994,7 +1068,7 @@ export async function handleRequest(
           ),
           env,
         );
-      const detailPath = url.pathname.match(/^\/inventory\/([^/]+)$/);
+      const detailPath = url.pathname.match(/^(?:\/zh)?\/inventory\/([^/]+)$/);
       if (detailPath) {
         const vehicle = await getVehicleBySlug(
           env.DB,

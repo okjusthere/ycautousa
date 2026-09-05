@@ -4,7 +4,7 @@
 
 The specification names React Router v8; at implementation time the public npm registry exposes React Router 7 as the latest stable release (7.18.x), so this project uses its compatible declarative routing APIs. The route/data boundaries are kept framework-neutral so the v8 framework adapter can be adopted when it is released without changing the Worker or D1 contracts.
 
-One React/Vite application is bundled into one Cloudflare Worker (`yc-auto-web`). Workers Assets serves the hashed client bundle. The Worker handles JSON APIs, redirects, sitemap/robots, and private media. Tailwind CSS is wired through the Vite plugin for repository-owned utility composition; the design system’s calibrated tokens and responsive components live in `src/styles/global.css`. There is no client-side dependency on a third-party runtime service.
+One React/Vite application is bundled into one Cloudflare Worker (`yc-auto-web`). Workers Assets serves the hashed client bundle. The Worker handles JSON APIs, redirects, bilingual sitemap/robots metadata, and private media. English public routes remain unprefixed and their Chinese equivalents use `/zh/*`; centralized copy and locale-aware links keep the same page and query string during language switches. Tailwind CSS is wired through the Vite plugin for repository-owned utility composition; the design system’s calibrated tokens and responsive components live in `src/styles/global.css`.
 
 | Concern                  | Cloudflare component                 | Code                                     |
 | ------------------------ | ------------------------------------ | ---------------------------------------- |
@@ -23,7 +23,7 @@ Public requests are served by the SPA, while `/api/*`, `/media/*`, `sitemap.xml`
 
 Admin mutations pass pinned Cloudflare Access JWT/JWKS validation (issuer, AUD, and time claims), exact email allowlisting, same-origin validation, body limits, and Zod parsing before D1 writes. Each material mutation adds an `audit_logs` row. Vehicle and image deletion is soft/deferred in the normal UI.
 
-Lead flow is `validate → Siteverify Turnstile → D1 insert → optional email → email_status update`. An email outage cannot lose a lead. IP addresses are never stored; an optional salted SHA-256 hash is used for abuse correlation.
+Lead flow is `validate → Siteverify Turnstile → D1 insert → optional email → email_status update`. Trade/Sell requests use the same guarded flow and store VIN, mileage, and WeChat in `details_json`, while the common contact fields remain queryable columns. An email outage cannot lose a lead. IP addresses are never stored; an optional salted SHA-256 hash is used for abuse correlation.
 
 ## Local mode
 

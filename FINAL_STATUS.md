@@ -1,10 +1,10 @@
 # YC Auto delivery status
 
-Updated: 2026-09-02
+Updated: 2026-09-04
 
 ## 1. Implemented
 
-- Responsive YC Auto USA public showroom: home, live inventory filters/sort/pagination, vehicle detail gallery with mobile swipe and sticky CTAs, similar inventory, about, contact, privacy, terms, sitemap, robots, canonical/OG metadata, AutoDealer/Car JSON-LD, and legacy 301 redirect resolution.
+- Responsive bilingual YC Auto USA public showroom: light editorial home, English and `/zh/*` routes, live Available-only make/year facets, inventory filters/sort/pagination, vehicle detail gallery, Trade/Sell form, shared Contact/Trade map, about, legal pages, localized sitemap/canonical/hreflang metadata, AutoDealer/Car JSON-LD, and legacy 301 redirects.
 - Protected admin workspace: overview counts, inventory search/filter/table, quick price/mileage/status edits, bulk status changes, duplicate/preview/hide/remove actions, one-page vehicle editor with linked make/model suggestions and manual entry, VIN Smart Fill, client resize + sequential multi-photo upload, drag/button reorder, cover selection, retry and soft delete, lead inbox/status/notes, editable website settings, and read-only audit log.
 - Cloudflare Worker request boundary with D1 prepared-statement repositories, private R2 media streaming and width/format allowlists, official Images binding transforms (`image/*` output MIME + transformation `.response()`), pinned Access JWKS/RS256 verification with issuer/AUD/time checks, exact email allowlist checks, same-origin mutation checks, body limits, rate limiting, Turnstile Siteverify adapter, graceful Email Service notification fallback, conversion event tracking, security headers, and short/immutable caching policies.
 - Server-side NHTSA vPIC VIN adapter with local VIN validation, D1 cache hits/touch/update, normalized fields, one conservative retry, five-second timeout, blank-field-only UI merge, and non-blocking outage behavior.
@@ -26,8 +26,8 @@ All code, local runtime, E2E, production-bundle, deployment, and live-site check
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 29 tests
-npm run test:e2e       PASS previously — 14 tests across Chromium + mobile
+npm run test           PASS — 9 files, 34 tests
+npm run test:e2e       PASS — 22 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
 npm audit (prod)       PASS — 0 vulnerabilities
 npm run deploy         PASS — Worker and assets deployed to Cloudflare
@@ -71,10 +71,10 @@ Access app: yc-auto-admin (temporary `/admin*` and `/api/admin*` paths)
 Access login: email one-time PIN; 24-hour session
 Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
-Current Worker version: ec897602-7e19-4304-b91d-402a731a0ed6
+Current Worker version: e6c2c3ca-1561-4f87-a27f-4adc810ab98b
 ```
 
-The public site, inventory, images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
+The bilingual public site, Trade/Sell workflow, Available-only inventory facets, maps, inventory images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. D1 migration `0004_trade_sell_and_localization.sql` is applied. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
 
 ## 6. Exact commands to run
 

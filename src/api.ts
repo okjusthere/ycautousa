@@ -1,4 +1,10 @@
-import type { DashboardStats, Lead, SiteSettings, Vehicle } from "../lib/types";
+import type {
+  DashboardStats,
+  InventoryFacets,
+  Lead,
+  SiteSettings,
+  Vehicle,
+} from "../lib/types";
 import { demoLeads, demoSettings, demoStats, demoVehicles } from "./demo";
 
 export type InventoryResponse = {
@@ -95,6 +101,27 @@ export async function getInventory(query = ""): Promise<InventoryResponse> {
             : (b.year ?? 0) - (a.year ?? 0),
     );
     return { vehicles: rows, total: rows.length, page: 1, perPage: 12 };
+  }
+}
+
+export async function getInventoryFacets(): Promise<InventoryFacets> {
+  try {
+    return await request("/api/inventory/facets");
+  } catch (error) {
+    if (!canUseLocalDemo()) throw error;
+    const available = demoVehicles.filter(
+      (vehicle) => vehicle.status === "available",
+    );
+    return {
+      makes: makeCounts(available),
+      years: [
+        ...new Set(
+          available
+            .map((vehicle) => vehicle.year)
+            .filter((year): year is number => year !== null),
+        ),
+      ].sort((a, b) => b - a),
+    };
   }
 }
 
