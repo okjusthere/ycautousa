@@ -71,7 +71,7 @@ Access app: yc-auto-admin (temporary `/admin*` and `/api/admin*` paths)
 Access login: email one-time PIN; 24-hour session
 Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
-Current Worker version: 22687e32-663b-439d-a465-2698556abe3a
+Current Worker version: 433b1eea-a866-4c79-9273-d9f377dfabf5
 ```
 
 The bilingual public site, Trade/Sell workflow, Available-only inventory facets, maps, inventory images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. D1 migration `0004_trade_sell_and_localization.sql` is applied. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
