@@ -1310,22 +1310,23 @@ function TradeSellPage() {
             </h1>
             <p className="trade-lede">{copy.trade.intro}</p>
           </div>
-          <div className="trade-steps">
-            {steps.map(([number, title, body]) => (
-              <div key={number}>
-                <span>{number}</span>
-                <strong>{title}</strong>
-                <p>{body}</p>
-              </div>
-            ))}
+          <div className="trade-content">
+            <div className="trade-steps">
+              {steps.map(([number, title, body]) => (
+                <div key={number}>
+                  <span>{number}</span>
+                  <strong>{title}</strong>
+                  <p>{body}</p>
+                </div>
+              ))}
+            </div>
+            <section
+              className="trade-form-wrap"
+              aria-label={copy.trade.formEyebrow}
+            >
+              <LeadForm type="trade_sell" compact />
+            </section>
           </div>
-        </div>
-        <div className="container trade-form-wrap">
-          <div className="trade-form-intro">
-            <p className="eyebrow">{copy.trade.formEyebrow}</p>
-            <h2>{copy.trade.formTitle}</h2>
-          </div>
-          <LeadForm type="trade_sell" />
         </div>
       </section>
       <LocationMap settings={settings} />
