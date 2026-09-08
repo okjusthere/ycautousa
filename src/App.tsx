@@ -310,33 +310,23 @@ function HomePage() {
             </Link>
           </div>
           <div className="make-list">
-            {(data.makes.length
-              ? data.makes
-              : localDemo
-                ? [
-                    { make: "Toyota", count: 2 },
-                    { make: "Honda", count: 1 },
-                    { make: "Mercedes-Benz", count: 1 },
-                    { make: "Subaru", count: 1 },
-                  ]
-                : []
-            )
-              .slice(0, 8)
-              .map((item, index) => (
-                <Link
-                  key={item.make}
-                  to={path(`/inventory?make=${encodeURIComponent(item.make)}`)}
-                  className="make-row"
-                >
-                  <span className="make-number">0{index + 1}</span>
-                  <strong>{item.make}</strong>
-                  <span className="make-count">
-                    {item.count}{" "}
-                    {item.count === 1 ? copy.home.vehicle : copy.home.vehicles}
-                  </span>
-                  <Icon name="arrow" size={18} />
-                </Link>
-              ))}
+            {data.makes.map((item, index) => (
+              <Link
+                key={item.make}
+                to={path(`/inventory?make=${encodeURIComponent(item.make)}`)}
+                className="make-row"
+              >
+                <span className="make-number">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <strong>{item.make}</strong>
+                <span className="make-count">
+                  {item.count}{" "}
+                  {item.count === 1 ? copy.home.vehicle : copy.home.vehicles}
+                </span>
+                <Icon name="arrow" size={18} />
+              </Link>
+            ))}
           </div>
         </div>
       </section>
@@ -476,10 +466,7 @@ function InventoryPage() {
           <span>{data?.total ?? "—"}</span>
           <small>
             {copy.inventory.vehiclesExplore.split("\n").map((line) => (
-              <span key={line}>
-                {line}
-                <br />
-              </span>
+              <span key={line}>{line}</span>
             ))}
           </small>
         </div>

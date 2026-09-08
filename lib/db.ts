@@ -251,7 +251,7 @@ function publicWhere(filters: InventoryFilters): {
   ];
   const params: unknown[] = [];
   if (filters.make) {
-    clauses.push("LOWER(v.make) = LOWER(?)");
+    clauses.push("LOWER(TRIM(v.make)) = LOWER(TRIM(?))");
     params.push(filters.make);
   }
   if (filters.model) {
@@ -355,7 +355,19 @@ export async function listMakes(
       "SELECT make, COUNT(*) AS count FROM vehicles WHERE status = 'available' AND deleted_at IS NULL AND make IS NOT NULL AND make <> '' GROUP BY make ORDER BY count DESC, make ASC",
     )
     .all<{ make: string; count: number }>();
-  return results.map((row) => ({ make: row.make, count: Number(row.count) }));
+  // Keep the most-used display spelling, but count case/whitespace variants together.
+  const makes = new Map<string, { make: string; count: number }>();
+  for (const row of results) {
+    const make = row.make.trim();
+    if (!make) continue;
+    const key = make.toLowerCase();
+    const existing = makes.get(key);
+    if (existing) existing.count += Number(row.count);
+    else makes.set(key, { make, count: Number(row.count) });
+  }
+  return [...makes.values()].sort(
+    (a, b) => b.count - a.count || a.make.localeCompare(b.make),
+  );
 }
 
 export async function listInventoryFacets(

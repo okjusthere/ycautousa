@@ -1,6 +1,6 @@
 # YC Auto delivery status
 
-Updated: 2026-09-04
+Updated: 2026-09-07
 
 ## 1. Implemented
 
@@ -26,8 +26,8 @@ All code, local runtime, E2E, production-bundle, deployment, and live-site check
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 34 tests
-npm run test:e2e       PASS — 22 tests across Chromium + mobile
+npm run test           PASS — 9 files, 35 tests
+npm run test:e2e       PASS — 26 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
 npm audit (prod)       PASS — 0 vulnerabilities
 npm run deploy         PASS — Worker and assets deployed to Cloudflare
@@ -71,7 +71,7 @@ Access app: yc-auto-admin (temporary `/admin*` and `/api/admin*` paths)
 Access login: email one-time PIN; 24-hour session
 Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
-Current Worker version: c0e63efa-05ca-4112-9b8c-3bd036279bd9
+Current Worker version: 22687e32-663b-439d-a465-2698556abe3a
 ```
 
 The bilingual public site, Trade/Sell workflow, Available-only inventory facets, maps, inventory images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. D1 migration `0004_trade_sell_and_localization.sql` is applied. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.

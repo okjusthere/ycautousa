@@ -69,6 +69,73 @@ describe("Worker API integration", () => {
     expect(denied.status).toBe(401);
   });
 
+  it("refreshes homepage makes and counts after inventory changes", async () => {
+    const create = async (make: string, status = "available") => {
+      const response = await handleRequest(
+        new Request("http://localhost:5173/api/admin/vehicles", {
+          method: "POST",
+          headers: adminHeaders,
+          body: JSON.stringify({
+            title: `2024 ${make} ${status} test`,
+            make,
+            status,
+            featured: false,
+            features: [],
+          }),
+        }),
+        env,
+      );
+      expect(response.status).toBe(201);
+      return ((await response.json()) as { id: string }).id;
+    };
+    const makes = async () => {
+      const response = await handleRequest(
+        new Request("http://localhost:5173/api/public/home"),
+        env,
+      );
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      return (
+        (await response.json()) as {
+          makes: Array<{ make: string; count: number }>;
+        }
+      ).makes;
+    };
+    const first = await create("Toyota");
+    expect(await makes()).toEqual([{ make: "Toyota", count: 1 }]);
+    const second = await create("TOYOTA");
+    await env.DB.prepare("UPDATE vehicles SET make = ' Toyota ' WHERE id = ?")
+      .bind(first)
+      .run();
+    await create("Volvo");
+    for (const status of ["draft", "hidden", "pending", "sold"])
+      await create("Excluded", status);
+    expect(await makes()).toEqual([
+      { make: "Toyota", count: 2 },
+      { make: "Volvo", count: 1 },
+    ]);
+    const filtered = await handleRequest(
+      new Request("http://localhost:5173/api/inventory?make=Toyota"),
+      env,
+    );
+    expect(((await filtered.json()) as { total: number }).total).toBe(2);
+    await env.DB.prepare("UPDATE vehicles SET status = 'sold' WHERE id = ?")
+      .bind(first)
+      .run();
+    expect(await makes()).toEqual([
+      { make: "TOYOTA", count: 1 },
+      { make: "Volvo", count: 1 },
+    ]);
+    const removal = await handleRequest(
+      new Request(`http://localhost:5173/api/admin/vehicles/${second}/delete`, {
+        method: "POST",
+        headers: adminHeaders,
+      }),
+      env,
+    );
+    expect(removal.status).toBe(200);
+    expect(await makes()).toEqual([{ make: "Volvo", count: 1 }]);
+  });
+
   it("returns facets from available inventory only", async () => {
     for (const vehicle of [
       {

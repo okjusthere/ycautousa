@@ -17,11 +17,11 @@ test.describe("public showroom", () => {
     await expect(
       page
         .locator(".site-header")
-        .getByRole("link", { name: "Our Staff", exact: true }),
+        .getByRole("link", { name: "Our Story", exact: true }),
     ).toBeVisible();
 
     await page.goto("/about");
-    await expect(page.getByText("Our Staff / YC Auto USA")).toBeVisible();
+    await expect(page.getByText("Our Story / YC Auto USA")).toBeVisible();
     const team = page.locator(".about-team-photo img");
     await expect(team).toBeVisible();
     await expect
