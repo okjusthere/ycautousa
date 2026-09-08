@@ -839,6 +839,7 @@ async function decoratePublicHtml(
   let socialImage = `${origin}/brand/team.jpg`;
   let structured: Record<string, unknown> | null = null;
   if (publicPath === "/") {
+    if (isZh) title = "YC Auto USA";
     try {
       const settings = await getSettings(env.DB);
       title = isZh ? settings.seoTitleZh || title : settings.seoTitle;

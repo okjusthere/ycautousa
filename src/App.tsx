@@ -177,7 +177,7 @@ function HomePage() {
   });
   const [loadError, setLoadError] = useState("");
   usePageMeta(
-    isZh ? data.settings.seoTitleZh || copy.home.title : data.settings.seoTitle,
+    isZh ? data.settings.seoTitleZh || "YC Auto USA" : data.settings.seoTitle,
     isZh
       ? data.settings.seoDescriptionZh || copy.home.subtitle
       : data.settings.seoDescription,
