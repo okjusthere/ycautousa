@@ -1125,15 +1125,6 @@ function AboutPage() {
   }, []);
   return (
     <section className="editorial-page">
-      <div className="container editorial-hero">
-        <p className="eyebrow">{copy.about.eyebrow}</p>
-        <h1>
-          {copy.about.title}
-          <br />
-          <em>{copy.about.accent}</em>
-        </h1>
-        <p className="editorial-lede">{copy.about.lede}</p>
-      </div>
       <div className="container editorial-grid">
         <div className="editorial-rail">
           <span>YC</span>
@@ -1145,6 +1136,15 @@ function AboutPage() {
               </span>
             ))}
           </small>
+          <div className="about-intro">
+            <p className="eyebrow">{copy.about.eyebrow}</p>
+            <h1>
+              {copy.about.title}
+              <br />
+              <em>{copy.about.accent}</em>
+            </h1>
+            <p className="editorial-lede">{copy.about.lede}</p>
+          </div>
         </div>
         <div className="editorial-body">
           <p>

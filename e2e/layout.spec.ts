@@ -4,6 +4,34 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("yc-auto-locale", "en"));
 });
 
+test("about introduction sits below YC beside the story on desktop", async ({
+  page,
+}) => {
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const route of ["/about", "/zh/about"]) {
+      await page.goto(route);
+      const rail = page.locator(".editorial-rail");
+      await expect(rail.locator("h1")).toBeVisible();
+      const mark = await rail.locator(":scope > span").boundingBox();
+      const intro = await rail.locator(".about-intro").boundingBox();
+      const body = await page.locator(".editorial-body").boundingBox();
+      expect(intro!.y).toBeGreaterThan(mark!.y + mark!.height);
+      if (width > 820) {
+        expect(intro!.x + intro!.width).toBeLessThan(body!.x);
+        expect(Math.abs(mark!.y - body!.y)).toBeLessThan(2);
+      } else {
+        expect(body!.y).toBeGreaterThan(intro!.y + intro!.height);
+      }
+      expect(
+        await rail
+          .locator("h1")
+          .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+      ).toBeLessThanOrEqual(40);
+    }
+  }
+});
+
 test("public pages fit desktop, tablet, and narrow phones in both languages", async ({
   page,
 }, testInfo) => {

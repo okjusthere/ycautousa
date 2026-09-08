@@ -1543,6 +1543,29 @@ select {
   letter-spacing: 0.16em;
   text-align: center;
 }
+.about-intro {
+  width: 100%;
+  margin-top: 10px;
+  color: var(--ink);
+}
+.about-intro .eyebrow {
+  font-size: 10px;
+}
+.about-intro h1 {
+  margin: 0 0 20px;
+  font-size: clamp(28px, 2.7vw, 40px);
+  font-weight: 570;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+.about-intro h1 em {
+  color: var(--red);
+  font-style: normal;
+}
+.about-intro .editorial-lede {
+  font-size: 16px;
+  line-height: 1.6;
+}
 .editorial-body > p {
   max-width: 720px;
   margin: 0;
@@ -3521,7 +3544,7 @@ select {
   }
   .editorial-rail {
     align-items: start;
-    flex-direction: row;
+    flex-direction: column;
     gap: 17px;
   }
   .editorial-rail > span {
