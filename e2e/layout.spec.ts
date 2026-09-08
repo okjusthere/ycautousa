@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("yc-auto-locale", "en"));
+});
+
 test("public pages fit desktop, tablet, and narrow phones in both languages", async ({
   page,
 }, testInfo) => {

@@ -40,7 +40,7 @@ export const messages = {
     home: {
       location: "Flushing, New York · Locally owned",
       title: "Find Your Next Car",
-      subtitle: "Quality pre-owned vehicles in Flushing, New York.",
+      subtitle: "The Biggest Wholesale Dealer in NY",
       browse: "Browse inventory",
       trade: "Trade or sell your car",
       proofInventory: "Curated local inventory",
@@ -335,7 +335,7 @@ export const messages = {
     home: {
       location: "纽约法拉盛 · 本地车行",
       title: "找到你的下一辆车",
-      subtitle: "纽约法拉盛优质二手车，信息透明，选车更轻松。",
+      subtitle: "纽约最大的汽车批发商",
       browse: "浏览在售车辆",
       trade: "置换或出售车辆",
       proofInventory: "精选本地库存",

@@ -34,6 +34,13 @@ export function PublicLayout() {
   const [settings, setSettings] = useState<SiteSettings>(demoSettings);
   const location = useLocation();
   const { copy, path, switchPath, locale } = useLocale();
+  const rememberLanguage = () => {
+    try {
+      localStorage.setItem("yc-auto-locale", locale === "zh" ? "en" : "zh");
+    } catch {
+      // The language link still works without persistent storage.
+    }
+  };
   useEffect(() => {
     let alive = true;
     getHome().then((data) => {
@@ -55,6 +62,15 @@ export function PublicLayout() {
       <header className="site-header">
         <div className="container header-inner">
           <Wordmark inverse />
+          <Link
+            className="language-switch language-switch--mobile"
+            to={switchPath}
+            onClick={rememberLanguage}
+            lang={locale === "zh" ? "en" : "zh-CN"}
+            aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
+          >
+            {copy.nav.language}
+          </Link>
           <button
             className="icon-button mobile-menu"
             aria-label={open ? copy.nav.closeMenu : copy.nav.menu}
@@ -93,6 +109,7 @@ export function PublicLayout() {
             <Link
               className="language-switch"
               to={switchPath}
+              onClick={rememberLanguage}
               lang={locale === "zh" ? "en" : "zh-CN"}
               aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
             >

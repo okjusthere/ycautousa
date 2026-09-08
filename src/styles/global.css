@@ -311,6 +311,9 @@ h3 {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+.language-switch--mobile {
+  display: none;
+}
 .main-nav > a:not(.nav-call) {
   position: relative;
   display: flex;
@@ -481,6 +484,11 @@ h3 {
   flex-wrap: wrap;
   gap: 12px;
 }
+.hero-actions .button {
+  min-height: 54px;
+  padding: 14px 24px;
+  font-size: 16px;
+}
 .hero--light {
   min-height: 680px;
   background: var(--paper);
@@ -501,9 +509,10 @@ h3 {
   max-width: 760px;
 }
 .hero--light h1 {
-  max-width: 690px;
-  font-size: clamp(64px, 8vw, 118px);
-  line-height: 0.84;
+  max-width: 620px;
+  font-size: clamp(42px, 6vw, 84px);
+  line-height: 1.03;
+  letter-spacing: -0.055em;
 }
 .hero--light .hero-subtitle {
   max-width: 560px;
@@ -3245,7 +3254,7 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .hero h1 {
-    font-size: clamp(70px, 11vw, 120px);
+    font-size: clamp(42px, 6vw, 66px);
   }
   .hero-mark {
     width: min(300px, 29vw);
@@ -3267,6 +3276,16 @@ select {
   }
   .mobile-menu {
     display: grid;
+  }
+  .language-switch--mobile {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    margin-left: auto;
+    margin-right: 16px;
+  }
+  .main-nav > a.language-switch {
+    display: none;
   }
   .main-nav {
     position: absolute;
@@ -3314,7 +3333,7 @@ select {
   }
   .hero h1 {
     max-width: 620px;
-    font-size: clamp(63px, 16vw, 112px);
+    font-size: clamp(42px, 8vw, 64px);
   }
   .hero-subtitle {
     margin-top: 26px;
@@ -3646,7 +3665,7 @@ select {
     height: 42px;
   }
   .hero h1 {
-    font-size: clamp(58px, 18vw, 90px);
+    font-size: clamp(38px, 10vw, 48px);
   }
   .hero-search {
     align-items: stretch;
@@ -3968,12 +3987,14 @@ select {
 .site-shell:lang(zh) :is(h1, h2, h3) em {
   font-style: normal;
 }
-.site-shell:lang(zh) .hero h1,
 .site-shell:lang(zh) .inventory-head h1,
 .site-shell:lang(zh) .editorial-hero h1,
 .site-shell:lang(zh) .contact-head h1,
 .site-shell:lang(zh) .legal-page h1 {
   font-size: clamp(36px, 5.2vw, 76px);
+}
+.site-shell:lang(zh) .hero h1 {
+  font-size: clamp(30px, 4vw, 56px);
 }
 .site-shell:lang(zh)
   :is(

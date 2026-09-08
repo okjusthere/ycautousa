@@ -13,9 +13,9 @@ export const demoSettings: SiteSettings = {
   address: "167-04 Northern Blvd, Flushing, NY 11358",
   businessHours: "Mon–Fri 10:00 AM–6:00 PM · Sat–Sun 12:00 PM–5:00 PM",
   heroTitle: "Find Your Next Car",
-  heroSubtitle: "Quality pre-owned vehicles in Flushing, New York.",
+  heroSubtitle: "The Biggest Wholesale Dealer in NY",
   heroTitleZh: "找到你的下一辆车",
-  heroSubtitleZh: "纽约法拉盛优质二手车，信息透明，选车更轻松。",
+  heroSubtitleZh: "纽约最大的汽车批发商",
   aboutText:
     "YC Auto USA is a neighborhood pre-owned vehicle dealer serving drivers in Flushing and the surrounding New York area. Browse our current inventory online, then call or send a note to arrange a visit.",
   aboutTextZh:

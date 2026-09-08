@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("public showroom", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem("yc-auto-locale", "en"),
+    );
+  });
+
   test("official brand logo and team photo load", async ({ page }) => {
     await page.goto("/");
     const logo = page.locator(".site-header .wordmark-logo");
