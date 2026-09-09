@@ -13,6 +13,7 @@ import {
   Route,
   Routes,
   useNavigate,
+  useLocation,
   useParams,
   useSearchParams,
 } from "react-router-dom";
@@ -45,6 +46,7 @@ import {
   vehicleImage,
 } from "../components/VehicleCard";
 import { LeadForm } from "../components/LeadForm";
+import { StaffSection } from "../components/StaffSection";
 import { modelsForMake, VEHICLE_MAKES } from "./vehicle-catalog";
 import {
   formatLocalizedMileage,
@@ -1116,15 +1118,22 @@ function VehicleDetailPage() {
   );
 }
 
-function AboutPage() {
-  const { copy, isZh, path } = useLocale();
-  const [settings, setSettings] = useState(demoSettings);
-  usePageMeta(copy.about.metaTitle, copy.about.metaDescription);
-  useEffect(() => {
-    getHome().then((data) => setSettings(data.settings));
-  }, []);
+function AboutRedirect() {
+  const { path } = useLocale();
+  const location = useLocation();
   return (
-    <section className="editorial-page">
+    <Navigate replace to={`${path("/contact")}${location.search}#our-story`} />
+  );
+}
+
+function StorySection({ settings }: { settings: SiteSettings }) {
+  const { copy, isZh, path } = useLocale();
+  return (
+    <section
+      className="editorial-page"
+      id="our-story"
+      aria-labelledby="story-heading"
+    >
       <div className="container editorial-grid">
         <div className="editorial-rail">
           <span>YC</span>
@@ -1138,11 +1147,11 @@ function AboutPage() {
           </small>
           <div className="about-intro">
             <p className="eyebrow">{copy.about.eyebrow}</p>
-            <h1>
+            <h2 id="story-heading">
               {copy.about.title}
               <br />
               <em>{copy.about.accent}</em>
-            </h1>
+            </h2>
             <p className="editorial-lede">{copy.about.lede}</p>
           </div>
         </div>
@@ -1193,7 +1202,7 @@ function LocationMap({ settings }: { settings: SiteSettings }) {
   const { copy, isZh } = useLocale();
   const query = encodeURIComponent(settings.address);
   return (
-    <section className="location-section">
+    <section className="location-section" id="visit-us">
       <div className="container location-grid">
         <div className="location-copy">
           <p className="eyebrow">{copy.map.eyebrow}</p>
@@ -1224,25 +1233,56 @@ function LocationMap({ settings }: { settings: SiteSettings }) {
 
 function ContactPage() {
   const { copy, isZh } = useLocale();
+  const { hash } = useLocation();
   const [settings, setSettings] = useState(demoSettings);
   usePageMeta(copy.contact.metaTitle, copy.contact.metaDescription);
   useEffect(() => {
     getHome().then((data) => setSettings(data.settings));
   }, []);
+  useEffect(() => {
+    if (
+      ![
+        "#our-story",
+        "#company-info",
+        "#meet-our-staff",
+        "#visit-us",
+        "#send-a-note",
+      ].includes(hash)
+    )
+      return;
+    const frame = requestAnimationFrame(() =>
+      document.getElementById(hash.slice(1))?.scrollIntoView(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [hash]);
   return (
     <>
-      <section className="contact-page">
+      <section className="contact-page contact-page--combined">
         <div className="container contact-head">
           <div>
             <p className="eyebrow">{copy.contact.eyebrow}</p>
             <h1>
-              {copy.contact.title}
-              <br />
-              <em>{copy.contact.accent}</em>
+              {copy.contact.heading}
+              <em>.</em>
             </h1>
             <p>{copy.contact.intro}</p>
+            <nav
+              className="contact-sections"
+              aria-label={copy.contact.sections}
+            >
+              <a href="#our-story">{copy.contact.story}</a>
+              <a href="#company-info">{copy.contact.company}</a>
+              <a href="#meet-our-staff">{copy.contact.staff}</a>
+              <a href="#visit-us">{copy.contact.directions}</a>
+              <a href="#send-a-note">{copy.contact.note}</a>
+            </nav>
           </div>
-          <div className="contact-direct">
+          <div
+            className="contact-direct"
+            id="company-info"
+            role="region"
+            aria-label={copy.contact.company}
+          >
             <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}>
               <span>{copy.contact.call}</span>
               <strong>{settings.phone}</strong>
@@ -1265,6 +1305,11 @@ function ContactPage() {
             </div>
           </div>
         </div>
+      </section>
+      <StorySection settings={settings} />
+      <StaffSection />
+      <LocationMap settings={settings} />
+      <section className="contact-note-section" id="send-a-note">
         <div className="container contact-form-wrap">
           <div className="contact-form-intro">
             <p className="eyebrow">{copy.contact.note}</p>
@@ -1278,7 +1323,6 @@ function ContactPage() {
           <LeadForm type="contact" />
         </div>
       </section>
-      <LocationMap settings={settings} />
     </>
   );
 }
@@ -3686,7 +3730,7 @@ export default function App() {
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:slug" element={<VehicleDetailPage />} />
         <Route path="trade-sell" element={<TradeSellPage />} />
-        <Route path="about" element={<AboutPage />} />
+        <Route path="about" element={<AboutRedirect />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="privacy" element={<LegalPage kind="privacy" />} />
         <Route path="terms" element={<LegalPage kind="terms" />} />
@@ -3697,7 +3741,7 @@ export default function App() {
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:slug" element={<VehicleDetailPage />} />
         <Route path="trade-sell" element={<TradeSellPage />} />
-        <Route path="about" element={<AboutPage />} />
+        <Route path="about" element={<AboutRedirect />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="privacy" element={<LegalPage kind="privacy" />} />
         <Route path="terms" element={<LegalPage kind="terms" />} />

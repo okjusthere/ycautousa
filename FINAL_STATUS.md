@@ -1,6 +1,6 @@
 # YC Auto delivery status
 
-Updated: 2026-09-08
+Updated: 2026-09-09
 
 ## 1. Implemented
 
@@ -26,8 +26,8 @@ All code, local runtime, E2E, production-bundle, deployment, and live-site check
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 35 tests
-npm run test:e2e       PASS — 32 tests across Chromium + mobile
+npm run test           PASS — 9 files, 36 tests
+npm run test:e2e       PASS — 36 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
 npm audit (prod)       PASS — 0 vulnerabilities
 npm run deploy         PASS — Worker and assets deployed to Cloudflare
@@ -37,6 +37,8 @@ verify:prod            PASS — public pages, five vehicle pages, sitemap, robot
 `npm ci --ignore-scripts` was also run successfully from the lockfile before the final verification pass.
 
 The UI was also visually smoke-checked with Playwright screenshots at desktop and phone widths. Local D1 migrations and seed commands completed successfully.
+
+Contact now combines company information, Our Story, a nine-person bilingual staff directory, the map, and the existing contact form. Staff photos and details come from the supplied Meet Our Staff document. Phone/email links and WeChat ID reveal/copy are implemented; unspecified contact details remain disabled, not invented. The old About URLs permanently redirect to Contact's story section. Maintenance and missing-field notes are in `docs/staff-directory.md`.
 
 The homepage now defaults to Chinese for first-time browser visits, remembers an explicit language choice, and provides a visible language switch on desktop and mobile. The hero heading is smaller, both primary action labels are larger, and migration `0005_homepage_intro.sql` updates the live English/Chinese hero subtitle. Layouts were checked at 1440px, 390px, and 320px without horizontal overflow.
 
@@ -73,7 +75,7 @@ Access app: yc-auto-admin (temporary `/admin*` and `/api/admin*` paths)
 Access login: email one-time PIN; 24-hour session
 Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
-Current Worker version: 04d0b2ed-f30a-452a-8d8a-7d039e42aaad
+Current Worker version: 21d3fbf0-447b-414c-8ea2-09e848a1453d
 ```
 
 The bilingual public site, Trade/Sell workflow, Available-only inventory facets, maps, inventory images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. D1 migration `0004_trade_sell_and_localization.sql` is applied. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.

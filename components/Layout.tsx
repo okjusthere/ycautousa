@@ -95,12 +95,6 @@ export function PublicLayout() {
               {copy.nav.trade}
             </NavLink>
             <NavLink
-              to={path("/about")}
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              {copy.nav.story}
-            </NavLink>
-            <NavLink
               to={path("/contact")}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
@@ -157,7 +151,6 @@ export function PublicFooter({
           <p className="eyebrow">{copy.nav.explore}</p>
           <Link to={path("/inventory")}>{copy.nav.inventory}</Link>
           <Link to={path("/trade-sell")}>{copy.nav.trade}</Link>
-          <Link to={path("/about")}>{copy.nav.story}</Link>
           <Link to={path("/contact")}>{copy.nav.contact}</Link>
           <Link to={path("/privacy")}>{copy.nav.privacy}</Link>
           <Link to={path("/terms")}>{copy.nav.terms}</Link>

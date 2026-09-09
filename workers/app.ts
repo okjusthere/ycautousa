@@ -756,7 +756,6 @@ function sitemapXml(
     "",
     "/inventory",
     "/trade-sell",
-    "/about",
     "/contact",
     "/privacy",
     "/terms",
@@ -881,19 +880,11 @@ async function decoratePublicHtml(
     snippet = isZh
       ? "提交 VIN、里程和联系方式，开始车辆置换或出售咨询。"
       : "Share your VIN, mileage, and contact details to start a Trade/Sell request.";
-  } else if (publicPath === "/about") {
-    title = isZh ? "关于我们｜YC Auto USA" : "Our Story | YC Auto USA";
-    description = isZh
-      ? "了解位于纽约法拉盛的本地二手车行 YC Auto USA。"
-      : "Meet YC Auto USA, a local pre-owned vehicle dealer in Flushing, New York.";
-    snippet = isZh
-      ? "熟悉本地，认真选车。"
-      : "Local knowledge. Good cars. A straightforward place to find your next vehicle.";
   } else if (publicPath === "/contact") {
     title = isZh ? "联系我们｜YC Auto USA" : "Contact | YC Auto USA";
     description = isZh
-      ? "致电、发送邮件或留言联系纽约法拉盛 YC Auto USA。"
-      : "Call, email, or send a message to YC Auto USA in Flushing, New York.";
+      ? "了解优选汽车的故事与团队，查看纽约法拉盛门店信息、联系方式和路线。"
+      : "Meet the YC Auto USA team, learn our story, and find contact details and directions in Flushing, New York.";
     snippet = isZh
       ? "欢迎致电、发送邮件或留言联系 YC Auto USA。"
       : "Let’s talk cars. Call, email, or send a note to YC Auto USA.";
@@ -1003,6 +994,18 @@ export async function handleRequest(
         Response.redirect(`${env.APP_ORIGIN}${url.pathname}${url.search}`, 301),
         env,
       );
+    if (
+      (request.method === "GET" || request.method === "HEAD") &&
+      /^\/(zh\/)?about\/?$/.test(url.pathname)
+    ) {
+      const target = new URL(
+        `${url.pathname.startsWith("/zh/") ? "/zh" : ""}/contact`,
+        url,
+      );
+      target.search = url.search;
+      target.hash = "our-story";
+      return withSecurity(Response.redirect(target.toString(), 301), env);
+    }
     if (url.pathname.startsWith("/media/"))
       return withSecurity(
         await serveMedia(

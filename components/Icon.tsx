@@ -11,6 +11,7 @@ export type IconName =
   | "phone"
   | "mail"
   | "message"
+  | "wechat"
   | "pin"
   | "search"
   | "speed"
@@ -98,6 +99,13 @@ export function Icon({
       <>
         <path d="M21 11.5a8 8 0 0 1-8.5 8 9.7 9.7 0 0 1-3.9-.8L3 20l1.3-4.1A8 8 0 1 1 21 11.5z" />
         <path d="M8 12h.01M12 12h.01M16 12h.01" />
+      </>
+    ),
+    wechat: (
+      <>
+        <path d="M14 11a6.5 6.5 0 1 0-10 2l-1 3 3-1a7 7 0 0 0 2 .3" />
+        <path d="M22 15c0-3-2.8-5-6-5s-6 2-6 5 2.8 5 6 5a8 8 0 0 0 2-.3l3 1-1-2.5a4 4 0 0 0 2-3.2Z" />
+        <path d="M6 8h.01M10 8h.01M14 15h.01M18 15h.01" />
       </>
     ),
     pin: (

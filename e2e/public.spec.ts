@@ -24,11 +24,18 @@ test.describe("public showroom", () => {
       page
         .locator(".site-header")
         .getByRole("link", { name: "Our Story", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page
+        .locator(".site-header")
+        .getByRole("link", { name: "Contact", exact: true }),
     ).toBeVisible();
 
     await page.goto("/about");
+    await expect(page).toHaveURL(/\/contact#our-story$/);
     await expect(page.getByText("Our Story / YC Auto USA")).toBeVisible();
     const team = page.locator(".about-team-photo img");
+    await page.locator(".about-team-photo").scrollIntoViewIfNeeded();
     await expect(team).toBeVisible();
     await expect
       .poll(() =>

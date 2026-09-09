@@ -12,10 +12,23 @@ test("about introduction sits below YC beside the story on desktop", async ({
     for (const route of ["/about", "/zh/about"]) {
       await page.goto(route);
       const rail = page.locator(".editorial-rail");
-      await expect(rail.locator("h1")).toBeVisible();
-      const mark = await rail.locator(":scope > span").boundingBox();
-      const intro = await rail.locator(".about-intro").boundingBox();
-      const body = await page.locator(".editorial-body").boundingBox();
+      await expect(rail.locator("h2")).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      // Read all positions in one frame; the legacy URL may be scrolling to its anchor.
+      const { mark, intro, body } = await rail.evaluate((el) => ({
+        mark: el
+          .querySelector(":scope > span")!
+          .getBoundingClientRect()
+          .toJSON(),
+        intro: el
+          .querySelector(".about-intro")!
+          .getBoundingClientRect()
+          .toJSON(),
+        body: document
+          .querySelector(".editorial-body")!
+          .getBoundingClientRect()
+          .toJSON(),
+      }));
       expect(intro!.y).toBeGreaterThan(mark!.y + mark!.height);
       if (width > 820) {
         expect(intro!.x + intro!.width).toBeLessThan(body!.x);
@@ -25,7 +38,7 @@ test("about introduction sits below YC beside the story on desktop", async ({
       }
       expect(
         await rail
-          .locator("h1")
+          .locator("h2")
           .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
       ).toBeLessThanOrEqual(40);
     }

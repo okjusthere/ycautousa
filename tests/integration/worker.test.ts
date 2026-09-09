@@ -470,6 +470,33 @@ describe("Worker API integration", () => {
     expect(response.status).toBe(200);
   });
 
+  it("redirects retired story URLs to the merged Contact page and removes them from the sitemap", async () => {
+    for (const method of ["GET", "HEAD"]) {
+      for (const prefix of ["", "/zh"]) {
+        for (const suffix of ["", "/"]) {
+          const response = await handleRequest(
+            new Request(
+              `http://localhost:5173${prefix}/about${suffix}?source=old`,
+              { method },
+            ),
+            env,
+          );
+          expect(response.status).toBe(301);
+          expect(response.headers.get("location")).toBe(
+            `http://localhost:5173${prefix}/contact?source=old#our-story`,
+          );
+        }
+      }
+    }
+    const response = await handleRequest(
+      new Request("http://localhost:5173/sitemap.xml"),
+      env,
+    );
+    const xml = await response.text();
+    expect(xml).not.toContain("/about");
+    expect(xml).toContain("/zh/contact");
+  });
+
   it("decorates Chinese public pages with localized SEO and alternates", async () => {
     const response = await handleRequest(
       new Request("http://localhost:5173/zh/contact"),
