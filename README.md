@@ -31,6 +31,9 @@ The Playwright suite starts a local D1-backed Worker session and covers public n
 
 ## Cloudflare deployment
 
+The existing production Worker now uses [GitHub main → checks → build → automatic deployment](docs/AUTO_DEPLOY.md).
+The following commands are for initial setup or explicitly requested manual maintenance:
+
 1. Authenticate Wrangler with `npx wrangler login`.
 2. Run `npm run bootstrap:cloudflare` (or follow the idempotent commands in [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)).
 3. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.jsonc` with the D1 id returned by Wrangler.
