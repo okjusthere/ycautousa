@@ -1,6 +1,6 @@
 # YC Auto delivery status
 
-Updated: 2026-09-09
+Updated: 2026-09-18
 
 ## 1. Implemented
 
@@ -69,16 +69,19 @@ Worker: yc-auto-web
 D1: yc-auto-prod (7d5c884b-3f9d-4b8c-9c9b-b3c0f6bd1356)
 R2: yc-auto-vehicle-images
 Images binding: IMAGES
-Temporary URL: https://yc-auto-web.okjusthere.workers.dev
+Production URL: https://www.ycautousa.com
+Redirecting hosts: ycautousa.com, yc-auto-web.okjusthere.workers.dev
 Turnstile: production Managed widget for the temporary URL, apex, and www hostnames
-Access app: yc-auto-admin (temporary `/admin*` and `/api/admin*` paths)
+Access app: yc-auto-admin (`/admin*` and `/api/admin*` on www and the temporary hostname)
 Access login: email one-time PIN; 24-hour session
 Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
-Current Worker version: 21d3fbf0-447b-414c-8ea2-09e848a1453d
+Deployment history: Cloudflare Workers dashboard for yc-auto-web
 ```
 
-The bilingual public site, Trade/Sell workflow, Available-only inventory facets, maps, inventory images, redirects, lead persistence, production Turnstile, and Cloudflare Access boundary are live on the temporary Worker hostname. D1 migration `0004_trade_sell_and_localization.sql` is applied. Unauthenticated requests to both admin paths return a 302 to the Access login page, and the exact Access policy and Worker defense-in-depth allowlist contain only `sophie@youxuancars.com` and `okjusthere@gmail.com`. Email Service is intentionally unbound, so leads persist in D1 but do not yet send notification email. Add the custom hostname to this Access application during the `ycautousa.com` cutover. Preserve existing MX/SPF/DKIM/DMARC/TXT records before DNS changes.
+The public site is now deployed at `https://www.ycautousa.com`. The apex hostname redirects to www with the path and query preserved. Both custom-domain bindings and the production canonical URL are managed in `wrangler.jsonc`, so subsequent main-branch deployments retain them. The existing Access application's AUD and exact two-email policy are preserved, with www admin paths added. Turnstile already permits both production hostnames. Remote migration inspection confirmed no pending D1 migrations through `0005_homepage_intro.sql`.
+
+The Cloudflare zone was active with no DNS records immediately before this deployment. Deployment created the two website bindings; no existing MX/TXT records were deleted or changed. Public-page, vehicle, original-image, sitemap, robots, legacy-redirect, and unauthenticated Access checks passed on the production hostname. Email Service remains intentionally unbound: leads persist in D1 but do not send notification email. The pre-cutover Worker version was `99e301ac-1d83-4617-9f36-0efaca97247c`; reverting its temporary canonical URL also requires retaining the workers.dev route.
 
 ## 6. Exact commands to run
 
@@ -112,16 +115,14 @@ Immediately before DNS cutover, run a fresh `dry` + `prepare` delta pass, review
 
 1. Complete a real one-time-PIN login with each administrator account, then smoke-test VIN decode, vehicle create/edit, and R2 image upload from the live admin.
 2. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
-3. Move `ycautousa.com` from its current Wix nameservers into this Cloudflare account after exporting the existing zone.
-4. Final business email confirmation in Website Settings. The business phone is confirmed as 718-799-0606 for voice calls only; SMS is intentionally disabled. Address and hours are confirmed.
-5. DNS custom-hostname binding and apex-to-`www` 301 while preserving mail records; add the production admin paths to the existing Access application and deploy the new canonical host/AUD if Cloudflare creates a separate Access application.
+3. Final business email confirmation in Website Settings. The business phone is confirmed as 718-799-0606 for voice calls only; SMS is intentionally disabled. Address and hours are confirmed.
 
 No credentials were fabricated, committed, or printed by the implementation.
 
 ## 8. Known limitations
 
 - The production Managed Turnstile widget is configured for the temporary, apex, and www hostnames.
-- Cloudflare Access is active on the temporary hostname, but each administrator still needs to complete one real email-code login. Notification email remains disabled until Email Service is configured. Public lead submissions still persist in D1.
+- Cloudflare Access is active on the production www and temporary hostnames, but each administrator still needs to complete one real email-code login on the production domain. Notification email remains disabled until Email Service is configured. Public lead submissions still persist in D1.
 - React Router v7.18.x is used because v8 is not currently published as a stable npm package.
 - Email Service still needs an authenticated smoke test after its sender and binding are attached. Live R2 media delivery already passed remote and HTTP checks.
 - The live legacy source contains one missing/invalid VIN (`2024 BMW X5`), retained as an audit-visible editable field.
@@ -138,7 +139,8 @@ No credentials were fabricated, committed, or printed by the implementation.
 - [x] Create the Zero Trust Access application, deploy its AUD/team domain, and verify the login redirect and exact two-email policy.
 - [ ] Complete a real OTP login for both administrator accounts, then test VIN decode and image upload in the live admin.
 - [ ] Configure Email Service and test a real lead notification email.
-- [ ] Export/preserve DNS and mail records; bind `www`, configure apex 301, and do not break MX/SPF/DKIM/DMARC.
+- [x] Inspect and preserve existing DNS state; bind `www` and apex, configure apex 301, and retain the Access allowlist. The zone contained no records before website binding.
 - [x] Deploy the workers.dev production preview with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, and Access redirect.
-- [ ] After custom-domain cutover, verify media, old URL 301s, and one real lead end-to-end.
+- [x] After custom-domain cutover, verify public pages, media, old URL 301s, and the Access redirect.
+- [ ] Complete one real lead submission end-to-end on the production domain.
 - [ ] Keep the old host read-only for seven days, monitor Worker/Email logs, and retain the rollback version and D1 bookmark.

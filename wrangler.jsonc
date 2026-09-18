@@ -42,9 +42,14 @@
   "env": {
     "production": {
       "name": "yc-auto-web",
+      "workers_dev": true,
+      "routes": [
+        { "pattern": "www.ycautousa.com", "custom_domain": true },
+        { "pattern": "ycautousa.com", "custom_domain": true },
+      ],
       "vars": {
-        "APP_ORIGIN": "https://yc-auto-web.okjusthere.workers.dev",
-        "CANONICAL_HOST": "yc-auto-web.okjusthere.workers.dev",
+        "APP_ORIGIN": "https://www.ycautousa.com",
+        "CANONICAL_HOST": "www.ycautousa.com",
         "TURNSTILE_SITE_KEY": "0x4AAAAAAElaAngmbPBisynr",
         "ADMIN_EMAILS": "sophie@youxuancars.com,okjusthere@gmail.com",
         "ACCESS_TEAM_DOMAIN": "https://okjusthere.cloudflareaccess.com",
