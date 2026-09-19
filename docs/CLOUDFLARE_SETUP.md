@@ -33,6 +33,16 @@ Public variables to set: `APP_ORIGIN=https://www.ycautousa.com`, `CANONICAL_HOST
 - Onboard and verify the sender domain in Cloudflare Email Service, then add the `EMAIL` send-email binding. Keep `EMAIL_TO` pointed to the lead recipient.
 - Enable Cloudflare Web Analytics for the public hostname. It is aggregate traffic analytics; D1 conversion rows are intentionally minimal.
 
+### Lead notification email
+
+The production sender is `leads@ycautousa.com`, and the verified destination is `sophie@youxuancars.com`. The sender domain is onboarded under **Compute > Email Service > Email Sending**. Cloudflare manages the `cf-bounce` MX/SPF records, `cf-bounce._domainkey` DKIM record, and `_dmarc` record. Sending setup does not require moving the domain's incoming mailbox routing.
+
+The production `send_email` binding in `wrangler.jsonc` is named `EMAIL`, restricted to Sophie as its `destination_address`, and restricted to `leads@ycautousa.com` in `allowed_sender_addresses`. Keep it inside `env.production`; email bindings are not inherited between environments. Set `EMAIL_FROM` to the sender and keep both `EMAIL_TO` and the admin Website Settings notification recipient aligned with Sophie. The database setting takes precedence over `EMAIL_TO`, so changing recipients requires verifying the new address and updating the binding as well.
+
+New inquiries are stored before notification is attempted. Missing configuration produces `skipped`; delivery API errors produce `failed`; API acceptance produces `sent`. These statuses do not confirm inbox delivery. Check Email Sending's Activity log for delivery/bounce results. Existing skipped/failed notifications are not retried or backfilled automatically, and customer acknowledgement emails are not enabled.
+
+Sending to an account's verified destination addresses is free and does not consume the outbound quota. Worker execution and storage still follow the account's existing plans. See [Cloudflare pricing](https://developers.cloudflare.com/email-service/platform/pricing/) and [send binding restrictions](https://developers.cloudflare.com/email-service/configuration/send-bindings/).
+
 ## 4. Access application
 
 Create a self-hosted Access application named `yc-auto-admin` for:

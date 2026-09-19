@@ -1,6 +1,6 @@
 # YC Auto delivery status
 
-Updated: 2026-09-18
+Updated: 2026-09-19
 
 ## 1. Implemented
 
@@ -77,13 +77,18 @@ Turnstile: production Managed widget for the temporary URL, apex, and www hostna
 Access app: yc-auto-admin (`/admin*` and `/api/admin*` on www and the temporary hostname)
 Access login: email one-time PIN; 24-hour session
 Access policy: only sophie@youxuancars.com and okjusthere@gmail.com
+Email sender: leads@ycautousa.com (verified Email Sending domain)
+Email destination: sophie@youxuancars.com (verified destination)
+Email binding: EMAIL, restricted to the sender and destination above
 Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare, not git
 Deployment history: Cloudflare Workers dashboard for yc-auto-web
 ```
 
 The public site is now deployed at `https://www.ycautousa.com`. The apex hostname redirects to www with the path and query preserved. Both custom-domain bindings and the production canonical URL are managed in `wrangler.jsonc`, so subsequent main-branch deployments retain them. The existing Access application's AUD and exact two-email policy are preserved, with www admin paths added. Turnstile already permits both production hostnames. Remote migration inspection confirmed no pending D1 migrations through `0005_homepage_intro.sql`.
 
-The Cloudflare zone was active with no DNS records immediately before this deployment. Deployment created the two website bindings; no existing MX/TXT records were deleted or changed. Public-page, vehicle, original-image, sitemap, robots, legacy-redirect, and unauthenticated Access checks passed on the production hostname. Email Service remains intentionally unbound: leads persist in D1 but do not send notification email. The pre-cutover Worker version was `99e301ac-1d83-4617-9f36-0efaca97247c`; reverting its temporary canonical URL also requires retaining the workers.dev route.
+The Cloudflare zone was active with no DNS records immediately before the website deployment. Deployment created the two website bindings; no existing MX/TXT records were deleted or changed. Public-page, vehicle, original-image, sitemap, robots, legacy-redirect, and unauthenticated Access checks passed on the production hostname. The pre-cutover Worker version was `99e301ac-1d83-4617-9f36-0efaca97247c`; reverting its temporary canonical URL also requires retaining the workers.dev route.
+
+On 2026-09-19, Email Sending was enabled for `ycautousa.com` (domain ID `679986f25521404c8cc2d148a1de127f`). Cloudflare added the `cf-bounce` MX/SPF, `cf-bounce._domainkey` DKIM, and `_dmarc` records; no incoming root-domain MX records were added or replaced. Sophie completed destination verification. The production `EMAIL` binding and `EMAIL_FROM` are configured in source, and the database notification recipient matches the verified destination. A single explicitly labeled configuration test was accepted through a real remote Worker email binding, without inserting a customer lead or sending historical notifications. See Email Sending Activity for delivery status. New successful inquiries now attempt a notification after saving the lead; notification errors still leave the lead accessible in admin.
 
 ## 6. Exact commands to run
 
@@ -116,7 +121,7 @@ Immediately before DNS cutover, run a fresh `dry` + `prepare` delta pass, review
 ## 7. Credentials/dashboard actions still required
 
 1. Complete a real one-time-PIN login with each administrator account, then smoke-test VIN decode, vehicle create/edit, and R2 image upload from the live admin.
-2. Email Service sender-domain onboarding, DNS verification, remote `EMAIL` binding, and final lead recipient.
+2. Review Email Service Activity logs for delivery failures when investigating a missing notification; historical skipped/failed notifications are not automatically resent.
 3. Final business email confirmation in Website Settings. The business phone is confirmed as 718-799-0606 for voice calls only; SMS is intentionally disabled. Address and hours are confirmed.
 
 No credentials were fabricated, committed, or printed by the implementation.
@@ -124,9 +129,9 @@ No credentials were fabricated, committed, or printed by the implementation.
 ## 8. Known limitations
 
 - The production Managed Turnstile widget is configured for the temporary, apex, and www hostnames.
-- Cloudflare Access is active on the production www and temporary hostnames, but each administrator still needs to complete one real email-code login on the production domain. Notification email remains disabled until Email Service is configured. Public lead submissions still persist in D1.
+- Cloudflare Access is active on the production www and temporary hostnames, but each administrator still needs to complete one real email-code login on the production domain. Public lead submissions persist in D1 before email notification is attempted.
 - React Router v7.18.x is used because v8 is not currently published as a stable npm package.
-- Email Service still needs an authenticated smoke test after its sender and binding are attached. Live R2 media delivery already passed remote and HTTP checks.
+- Email notifications are limited to the verified Sophie destination. Changing the admin notification recipient also requires verifying that address and updating the production binding. Customer acknowledgement emails and automatic notification retries are not enabled. Live R2 media delivery already passed remote and HTTP checks.
 - The live legacy source contains one missing/invalid VIN (`2024 BMW X5`), retained as an audit-visible editable field.
 - The migration script accepts legacy originals up to 25 MB; new admin uploads are limited to 12 MB and should be resized before import when practical.
 - Local dev emits Cloudflare Vite-plugin certificate warnings in this environment; they do not affect the production bundle.
@@ -140,9 +145,9 @@ No credentials were fabricated, committed, or printed by the implementation.
 - [x] Deploy the workers.dev preview and verify public pages, inventory, legacy redirects, media, lead persistence, and admin denial.
 - [x] Create the Zero Trust Access application, deploy its AUD/team domain, and verify the login redirect and exact two-email policy.
 - [ ] Complete a real OTP login for both administrator accounts, then test VIN decode and image upload in the live admin.
-- [ ] Configure Email Service and test a real lead notification email.
+- [x] Configure Email Service sender DNS, verify the destination, deploy the restricted email binding, and send an explicitly labeled service test through the real binding without creating a customer lead.
 - [x] Inspect and preserve existing DNS state; bind `www` and apex, configure apex 301, and retain the Access allowlist. The zone contained no records before website binding.
 - [x] Deploy the workers.dev production preview with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, and Access redirect.
 - [x] After custom-domain cutover, verify public pages, media, old URL 301s, and the Access redirect.
-- [x] Submit the production contact form with its real Turnstile challenge, confirm the success message and matching D1 row, then remove the explicitly marked deployment-test lead. Email delivery remains disabled.
+- [x] Submit the production contact form with its real Turnstile challenge, confirm the success message and matching D1 row, then remove the explicitly marked deployment-test lead. This form check preceded Email Service activation; email was tested separately after activation.
 - [ ] Keep the old host read-only for seven days, monitor Worker/Email logs, and retain the rollback version and D1 bookmark.

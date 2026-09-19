@@ -63,11 +63,18 @@
         "ADMIN_EMAILS": "sophie@youxuancars.com,okjusthere@gmail.com",
         "ACCESS_TEAM_DOMAIN": "https://okjusthere.cloudflareaccess.com",
         "ACCESS_AUD_TAG": "23e2984c90f3ead6bf27ea697a4ec9f3c8b1c04ab9c5733a5a84a4c2306e1a70",
-        "EMAIL_FROM": "",
+        "EMAIL_FROM": "leads@ycautousa.com",
         "EMAIL_TO": "sophie@youxuancars.com",
         "ENVIRONMENT": "production",
         "DEV_ADMIN_EMAIL": "",
       },
+      "send_email": [
+        {
+          "name": "EMAIL",
+          "destination_address": "sophie@youxuancars.com",
+          "allowed_sender_addresses": ["leads@ycautousa.com"],
+        },
+      ],
       "d1_databases": [
         {
           "binding": "DB",
