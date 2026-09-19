@@ -24,6 +24,14 @@ const apiBodies: Record<string, unknown> = {
 };
 
 function healthyResponse(path: string): Response {
+  if (path === "/assets/app.js")
+    return new Response("console.log('app entry');", {
+      headers: { "Content-Type": "application/javascript" },
+    });
+  if (path === "/assets/app.css")
+    return new Response("body { margin: 0; }", {
+      headers: { "Content-Type": "text/css" },
+    });
   if (path === "/admin" || path === "/api/admin/dashboard")
     return new Response(null, { status: 401 });
   if (path.endsWith("/about"))
@@ -50,6 +58,7 @@ function healthyResponse(path: string): Response {
   return new Response(
     `<!doctype html><html lang="${language}"><head>
     <link rel="canonical" href="${origin}${path}">
+    <link rel="stylesheet" href="/assets/app.css">
     <script type="module" src="/assets/app.js"></script>
     </head><body><div id="root"></div></body></html>`,
     { headers: { "Content-Type": "text/html" } },
@@ -89,6 +98,41 @@ describe("production smoke checks", () => {
     const report = await verify();
     expect(report.results.every((result) => result.ok)).toBe(true);
     expect(process.exitCode).toBe(0);
+    expect(
+      report.results.filter((result) => result.path.startsWith("/assets/")),
+    ).toHaveLength(2);
+    const paths = vi
+      .mocked(fetch)
+      .mock.calls.map(([url]) => new URL(String(url)).pathname);
+    expect(paths.filter((path) => path === "/assets/app.js")).toHaveLength(1);
+    expect(paths.filter((path) => path === "/assets/app.css")).toHaveLength(1);
+  });
+
+  it("rejects missing JavaScript and an HTML fallback returned for a stylesheet", async () => {
+    const report = await verify({
+      "/assets/app.js": () => new Response("Not found", { status: 404 }),
+      "/assets/app.css": () =>
+        new Response(incidentHtml, {
+          headers: { "Content-Type": "text/html" },
+        }),
+    });
+    expect(
+      report.results
+        .filter((result) => !result.ok)
+        .map((result) => result.path),
+    ).toEqual(["/assets/app.css", "/assets/app.js"]);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("rejects empty entry assets even with a valid content type", async () => {
+    const report = await verify({
+      "/assets/app.js": () =>
+        new Response("  ", { headers: { "Content-Type": "text/javascript" } }),
+    });
+    expect(
+      report.results.find((result) => result.path === "/assets/app.js"),
+    ).toMatchObject({ ok: false, status: "entry asset is empty" });
+    expect(process.exitCode).toBe(1);
   });
 
   it("rejects the incident's HTML 200 response for every public API and the admin API", async () => {

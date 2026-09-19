@@ -394,6 +394,7 @@ describe("Worker API integration", () => {
   });
 
   it("keeps a lead when optional email delivery fails", async () => {
+    const pending: Promise<unknown>[] = [];
     const failingEnv: Env = {
       ...env,
       EMAIL: {
@@ -416,14 +417,15 @@ describe("Worker API integration", () => {
         }),
       }),
       failingEnv,
-      undefined,
+      { waitUntil: (task: Promise<unknown>) => pending.push(task) },
       { turnstileImpl: async () => ({ success: true }) },
     );
     expect(response.status).toBe(200);
+    await Promise.all(pending);
     const row = await env.DB.prepare(
       "SELECT email_status AS emailStatus FROM leads ORDER BY created_at DESC LIMIT 1",
     ).first<{ emailStatus: string }>();
-    expect(row?.emailStatus).toBe("failed");
+    expect(row?.emailStatus).toBe("unknown");
   });
 
   it("accepts Cloudflare's dummy hostname only with the official test site key", async () => {

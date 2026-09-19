@@ -8,7 +8,6 @@ import {
   getSettings,
   getVehicleById,
   getVehicleBySlug,
-  insertLead,
   listAdminVehicles,
   listAudit,
   listFeaturedVehicles,
@@ -25,7 +24,6 @@ import {
   softDeleteVehicle,
   trackEvent,
   updateLead,
-  updateLeadEmailStatus,
   updateSettings,
   updateVehicleStatus,
   upsertImage,
@@ -60,7 +58,8 @@ import {
   securityHeaders,
   rateLimitKey,
 } from "./security";
-import { sendLeadNotification } from "./email";
+import { findSubmission, saveLeadAndNotification } from "../lib/lead-delivery";
+import { queueManualRetry, scheduleNotification } from "./notifications";
 import { MediaUploadError, serveMedia, uploadVehicleImage } from "./media";
 import { verifyTurnstile } from "./turnstile";
 import { assertVehicleTransition } from "../lib/status";
@@ -76,7 +75,6 @@ const allowedTrackEvents = new Set([
   "sms_click",
   "email_click",
   "availability_open",
-  "lead_submitted",
 ]);
 
 function json(data: unknown, status = 200, headers?: HeadersInit): Response {
@@ -185,6 +183,7 @@ async function publicApi(
   request: Request,
   env: Env,
   path: string,
+  ctx: ExecutionContextLike,
   options: RequestOptions = {},
 ): Promise<Response | null> {
   if (path === "/api/public/home" && request.method === "GET") {
@@ -246,7 +245,7 @@ async function publicApi(
       : errorResponse("Vehicle not found", 404);
   }
   if (path === "/api/leads" && request.method === "POST")
-    return submitLead(request, env, options);
+    return submitLead(request, env, ctx, options);
   if (path === "/api/track" && request.method === "POST") {
     if (!bodyWithinLimit(request, 4000))
       return errorResponse("Request is too large", 413);
@@ -268,6 +267,7 @@ async function publicApi(
 async function submitLead(
   request: Request,
   env: Env,
+  ctx: ExecutionContextLike,
   options: RequestOptions = {},
 ): Promise<Response> {
   if (!bodyWithinLimit(request, 16 * 1024))
@@ -291,6 +291,38 @@ async function submitLead(
   if (!parsed.success)
     return errorResponse("Please check the form fields and try again.", 400);
   if (parsed.data.honeypot) return json({ ok: true });
+  const submissionKey = request.headers.get("Idempotency-Key");
+  if (submissionKey !== null && !/^[A-Za-z0-9_-]{16,128}$/.test(submissionKey))
+    return errorResponse("Invalid submission key", 400);
+  const fingerprint = JSON.stringify({
+    ...parsed.data,
+    turnstileToken: undefined,
+    honeypot: undefined,
+    utm: Object.fromEntries(
+      Object.entries(parsed.data.utm).sort(([a], [b]) => a.localeCompare(b)),
+    ),
+  });
+  const submissionHash = Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(fingerprint),
+      ),
+    ),
+  )
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  // A retry after a lost response must work even though Turnstile consumed its token.
+  if (submissionKey) {
+    const existing = await findSubmission(env.DB, submissionKey);
+    if (existing)
+      return existing.hash === submissionHash
+        ? json({ ok: true, leadId: existing.id })
+        : errorResponse(
+            "This submission key was already used for different form details.",
+            409,
+          );
+  }
   const verifier = options.turnstileImpl ?? verifyTurnstile;
   const tokenResult =
     !env.TURNSTILE_SECRET_KEY &&
@@ -328,45 +360,53 @@ async function submitLead(
     if (!vehicle || vehicle.status === "sold")
       return errorResponse("That vehicle is no longer available.", 409);
   }
-  const leadId = await insertLead(env.DB, {
-    vehicleId: vehicle?.id ?? null,
-    leadType: parsed.data.leadType,
-    name: parsed.data.name,
-    phone: parsed.data.phone ?? null,
-    email: parsed.data.email ?? null,
-    preferredContact:
-      parsed.data.leadType === "trade_sell"
-        ? parsed.data.phone
-          ? "phone"
-          : parsed.data.email
-            ? "email"
-            : "wechat"
-        : parsed.data.preferredContact,
-    message: parsed.data.message ?? null,
-    details:
-      parsed.data.leadType === "trade_sell"
-        ? {
-            vin: parsed.data.vin ?? undefined,
-            mileage: parsed.data.mileage ?? undefined,
-            wechat: parsed.data.wechat ?? undefined,
-          }
-        : {},
-    sourceUrl: parsed.data.sourceUrl ?? request.url,
-    referrer: parsed.data.referrer ?? request.headers.get("Referer"),
-    utm: parsed.data.utm,
-    country: request.headers.get("CF-IPCountry"),
-    ipHash: await hashIp(
-      request.headers.get("CF-Connecting-IP"),
-      env.IP_HASH_SALT,
-    ),
-  });
-  const settings = await getSettings(env.DB);
-  const saved = await getLead(env.DB, leadId);
-  let emailStatus: "sent" | "skipped" | "failed" = "skipped";
-  if (saved) emailStatus = await sendLeadNotification(env, settings, saved);
-  await updateLeadEmailStatus(env.DB, leadId, emailStatus);
-  await trackEvent(env.DB, "lead_submitted", vehicle?.id ?? null);
-  return json({ ok: true, leadId });
+  const saved = await saveLeadAndNotification(
+    env.DB,
+    {
+      vehicleId: vehicle?.id ?? null,
+      leadType: parsed.data.leadType,
+      name: parsed.data.name,
+      phone: parsed.data.phone ?? null,
+      email: parsed.data.email ?? null,
+      preferredContact:
+        parsed.data.leadType === "trade_sell"
+          ? parsed.data.phone
+            ? "phone"
+            : parsed.data.email
+              ? "email"
+              : "wechat"
+          : parsed.data.preferredContact,
+      message: parsed.data.message ?? null,
+      details:
+        parsed.data.leadType === "trade_sell"
+          ? {
+              vin: parsed.data.vin ?? undefined,
+              mileage: parsed.data.mileage ?? undefined,
+              wechat: parsed.data.wechat ?? undefined,
+            }
+          : {},
+      sourceUrl: parsed.data.sourceUrl ?? request.url,
+      referrer: parsed.data.referrer ?? request.headers.get("Referer"),
+      utm: parsed.data.utm,
+      country: request.headers.get("CF-IPCountry"),
+      ipHash: await hashIp(
+        request.headers.get("CF-Connecting-IP"),
+        env.IP_HASH_SALT,
+      ),
+    },
+    {
+      key: submissionKey,
+      hash: submissionHash,
+      recipient: env.EMAIL_TO?.trim() ?? "",
+    },
+  );
+  if (saved.hash !== submissionHash)
+    return errorResponse(
+      "This submission key was already used for different form details.",
+      409,
+    );
+  if (saved.created) scheduleNotification(env, ctx, saved.id);
+  return json({ ok: true, leadId: saved.id });
 }
 
 async function adminApi(
@@ -679,6 +719,33 @@ async function adminApi(
     ) as LeadStatus | null;
     return json({ leads: await listLeads(env.DB, status ?? undefined) });
   }
+  const retryMatch = path.match(/^\/api\/admin\/leads\/([^/]+)\/email\/retry$/);
+  if (retryMatch && request.method === "POST") {
+    const id = decodeURIComponent(retryMatch[1]);
+    const lead = await getLead(env.DB, id);
+    if (!lead) return errorResponse("Lead not found", 404);
+    const body = await parseJsonBody(request);
+    const confirmUncertain =
+      !!body &&
+      typeof body === "object" &&
+      "confirmUncertain" in body &&
+      body.confirmUncertain === true;
+    if (!env.EMAIL || !env.EMAIL_FROM?.trim() || !env.EMAIL_TO?.trim())
+      return errorResponse(
+        "Email service is not configured. Please contact the site administrator.",
+        503,
+      );
+    const queued = await queueManualRetry(env, id, email, confirmUncertain);
+    if (!queued)
+      return errorResponse(
+        lead.emailStatus === "unknown" && !confirmUncertain
+          ? "Check the mailbox first, then confirm that a resend is needed."
+          : "Retry is unavailable: this email is queued, already sent, or was attempted within the last minute.",
+        409,
+      );
+    scheduleNotification(env, ctx, id);
+    return json({ ok: true, lead: await getLead(env.DB, id) }, 202);
+  }
   const leadMatch = path.match(/^\/api\/admin\/leads\/([^/]+)$/);
   if (leadMatch && request.method === "GET") {
     const lead = await getLead(env.DB, decodeURIComponent(leadMatch[1]));
@@ -695,7 +762,15 @@ async function adminApi(
     return json({ ok: true, lead: await getLead(env.DB, id) });
   }
   if (path === "/api/admin/settings" && request.method === "GET")
-    return json({ settings: await getSettings(env.DB) });
+    return json({
+      settings: {
+        ...(await getSettings(env.DB)),
+        ...(env.EMAIL_TO
+          ? { leadNotificationRecipient: env.EMAIL_TO.trim() }
+          : {}),
+      },
+      notificationRecipient: env.EMAIL_TO?.trim() ?? null,
+    });
   if (
     path === "/api/admin/settings" &&
     (request.method === "PUT" || request.method === "PATCH")
@@ -703,6 +778,14 @@ async function adminApi(
     const parsed = settingsSchema.safeParse(await parseJsonBody(request));
     if (!parsed.success)
       return errorResponse("Please check the settings fields.");
+    if (
+      env.EMAIL_TO?.trim() &&
+      parsed.data.leadNotificationRecipient !== env.EMAIL_TO.trim()
+    )
+      return errorResponse(
+        "Notification email must match the verified recipient configured for this deployment.",
+        400,
+      );
     await updateSettings(env.DB, parsed.data as SiteSettings);
     await addAudit(env.DB, email, "settings_updated", "settings", "1");
     return json({ ok: true, settings: await getSettings(env.DB) });
@@ -1019,7 +1102,13 @@ export async function handleRequest(
       const guard = await adminGuard(request, env, options.fetchImpl);
       if (guard instanceof Response) return withSecurity(guard, env);
     }
-    const publicResult = await publicApi(request, env, url.pathname, options);
+    const publicResult = await publicApi(
+      request,
+      env,
+      url.pathname,
+      ctx,
+      options,
+    );
     if (publicResult) return withSecurity(publicResult, env);
     const adminResult = await adminApi(
       request,

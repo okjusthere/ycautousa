@@ -6,7 +6,7 @@ Updated: 2026-09-19
 
 - Responsive bilingual YC Auto USA public showroom: light editorial home, English and `/zh/*` routes, live Available-only make/year facets, inventory filters/sort/pagination, vehicle detail gallery, Trade/Sell form, shared Contact/Trade map, about, legal pages, localized sitemap/canonical/hreflang metadata, AutoDealer/Car JSON-LD, and legacy 301 redirects.
 - Protected admin workspace: overview counts, inventory search/filter/table, quick price/mileage/status edits, bulk status changes, duplicate/preview/hide/remove actions, one-page vehicle editor with linked make/model suggestions and manual entry, VIN Smart Fill, client resize + sequential multi-photo upload, drag/button reorder, cover selection, retry and soft delete, lead inbox/status/notes, editable website settings, and read-only audit log.
-- Cloudflare Worker request boundary with D1 prepared-statement repositories, private R2 media streaming and width/format allowlists, official Images binding transforms (`image/*` output MIME + transformation `.response()`), pinned Access JWKS/RS256 verification with issuer/AUD/time checks, exact email allowlist checks, same-origin mutation checks, body limits, rate limiting, Turnstile Siteverify adapter, graceful Email Service notification fallback, conversion event tracking, security headers, and short/immutable caching policies.
+- Cloudflare Worker request boundary with D1 prepared-statement repositories, private R2 media streaming and width/format allowlists, official Images binding transforms (`image/*` output MIME + transformation `.response()`), pinned Access JWKS/RS256 verification with issuer/AUD/time checks, exact email allowlist checks, same-origin mutation checks, body limits, rate limiting, Turnstile Siteverify adapter, durable Email Service notification outbox and conservative retry recovery, conversion event tracking, security headers, and short/immutable caching policies.
 - Server-side NHTSA vPIC VIN adapter with local VIN validation, D1 cache hits/touch/update, normalized fields, one conservative retry, five-second timeout, blank-field-only UI merge, and non-blocking outage behavior.
 - Repeatable legacy migration utility with polite pagination discovery, label-based parsing, source-value preservation, normalization/audit warnings, image filtering/download validation/retry/hash deduplication, generated SQL/manifests/redirects, explicit apply confirmation, and offline verification.
 - Versioned D1 schema, local seed utility, Cloudflare bootstrap/preflight/production verification scripts, Vitest unit/integration coverage, and Playwright desktop/mobile E2E coverage.
@@ -14,13 +14,13 @@ Updated: 2026-09-19
 
 ## 2. Architecture summary
 
-One Vite React application is bundled into the `yc-auto-web` Cloudflare Worker. Workers Assets serves the client bundle; the Worker handles APIs, SEO endpoints, redirects, and media. D1 (`yc-auto-prod`) stores inventory, leads, settings, redirects, audit entries, VIN cache, and daily conversion counters. A private R2 bucket (`yc-auto-vehicle-images`) stores immutable originals; an Images binding transforms approved widths. Cloudflare Access is the production authentication boundary, with Worker-side defense-in-depth allowlisting. Turnstile and Email Service are optional Cloudflare bindings whose failures do not block core inventory or lead persistence. NHTSA vPIC is the only external API.
+One Vite React application is bundled into the `yc-auto-web` Cloudflare Worker. Workers Assets serves the client bundle; the Worker handles APIs, SEO endpoints, redirects, and media. D1 (`yc-auto-prod`) stores inventory, leads, settings, redirects, audit entries, VIN cache, and daily conversion counters. A private R2 bucket (`yc-auto-vehicle-images`) stores immutable originals; an Images binding transforms approved widths. Cloudflare Access is the production authentication boundary, with Worker-side defense-in-depth allowlisting. Turnstile verifies public submissions; failed verification prevents accepting a new inquiry. Email Service runs independently after persistence, so mail failures do not lose a saved lead. NHTSA vPIC is the only external API.
 
 The specification requests React Router v8. The npm registry currently exposes React Router 7.18.x as the latest stable release, so the implementation uses its compatible declarative route APIs and keeps the data/Worker contracts adapter-neutral for a future v8 framework adapter.
 
 ## 3. Verification results
 
-All code, local runtime, E2E, production-bundle, deployment, and live-site checks passed:
+The original launch checks below passed. Latest reliability verification is recorded immediately after this baseline:
 
 ```text
 npm run format:check   PASS
@@ -33,6 +33,30 @@ npm audit (prod)       PASS — 0 vulnerabilities
 npm run deploy         PASS — Worker and assets deployed to Cloudflare
 verify:prod            PASS — public pages, six vehicle pages, four JSON APIs, media, redirects, sitemap, robots, and Cloudflare Access protection
 ```
+
+The 2026-09-19 reliability update passed formatting, zero-warning lint,
+TypeScript, 72 unit/integration tests in 13 files, and all 78 desktop/mobile
+browser scenarios. The initial full browser run passed 76 cases; two layout
+loops were interrupted by Vite reloads triggered by concurrent documentation
+edits. Their traces identified the reloads. A dedicated Playwright environment
+now disables HMR, and both interrupted cases passed on recheck without retries
+or relaxed assertions. The production client and Worker build passed.
+
+The update adds safe API response validation, page error recovery, a reusable
+Turnstile lifecycle, idempotent inquiry persistence, a durable notification
+outbox, bounded rate/quota retries, and explicit review of uncertain sends.
+Admin email status polling preserves unsaved lead notes. Photo order/cover
+writes now serialize and recover the authoritative saved state after failures.
+Public visual design is unchanged; recovery controls appear on failures.
+
+Migration `0006_reliable_notifications.sql` was applied remotely before the new
+code deployment. The post-migration read confirmed one existing inquiry,
+35 available vehicles, and zero queued historical notifications. Recovery
+instructions and the pre-migration bookmark are in `docs/LEAD_NOTIFICATIONS.md`.
+The actual Cloudflare Builds deploy command is now `npm run deploy:ci`; each
+main-branch release verifies public pages, structured APIs, entry JS/CSS,
+redirects, and Access protection after publishing. Recovery scenarios use local
+mocks and introduce no additional real emails or production test inquiries.
 
 `npm ci --ignore-scripts` was also run successfully from the lockfile before the final verification pass.
 
@@ -84,7 +108,7 @@ Secrets: TURNSTILE_SECRET_KEY and a random IP_HASH_SALT are stored in Cloudflare
 Deployment history: Cloudflare Workers dashboard for yc-auto-web
 ```
 
-The public site is now deployed at `https://www.ycautousa.com`. The apex hostname redirects to www with the path and query preserved. Both custom-domain bindings and the production canonical URL are managed in `wrangler.jsonc`, so subsequent main-branch deployments retain them. The existing Access application's AUD and exact two-email policy are preserved, with www admin paths added. Turnstile already permits both production hostnames. Remote migration inspection confirmed no pending D1 migrations through `0005_homepage_intro.sql`.
+The public site is now deployed at `https://www.ycautousa.com`. The apex hostname redirects to www with the path and query preserved. Both custom-domain bindings and the production canonical URL are managed in `wrangler.jsonc`, so subsequent main-branch deployments retain them. The existing Access application's AUD and exact two-email policy are preserved, with www admin paths added. Turnstile already permits both production hostnames. Remote migration inspection confirmed migrations through `0006_reliable_notifications.sql` are applied.
 
 The Cloudflare zone was active with no DNS records immediately before the website deployment. Deployment created the two website bindings; no existing MX/TXT records were deleted or changed. Public-page, vehicle, original-image, sitemap, robots, legacy-redirect, and unauthenticated Access checks passed on the production hostname. The pre-cutover Worker version was `99e301ac-1d83-4617-9f36-0efaca97247c`; reverting its temporary canonical URL also requires retaining the workers.dev route.
 
@@ -131,7 +155,7 @@ No credentials were fabricated, committed, or printed by the implementation.
 - The production Managed Turnstile widget is configured for the temporary, apex, and www hostnames.
 - Cloudflare Access is active on the production www and temporary hostnames, but each administrator still needs to complete one real email-code login on the production domain. Public lead submissions persist in D1 before email notification is attempted.
 - React Router v7.18.x is used because v8 is not currently published as a stable npm package.
-- Email notifications are limited to the verified Sophie destination. Changing the admin notification recipient also requires verifying that address and updating the production binding. Customer acknowledgement emails and automatic notification retries are not enabled. Live R2 media delivery already passed remote and HTTP checks.
+- Email notifications are limited to the verified Sophie destination. Changing the admin notification recipient also requires verifying that address and updating the production binding. Customer acknowledgement emails are not enabled. New notifications use a durable outbox, with bounded retries for rate/quota rejections and explicit admin confirmation for uncertain sends; historical inquiries are not automatically backfilled. Live R2 media delivery already passed remote and HTTP checks.
 - The live legacy source contains one missing/invalid VIN (`2024 BMW X5`), retained as an audit-visible editable field.
 - The migration script accepts legacy originals up to 25 MB; new admin uploads are limited to 12 MB and should be resized before import when practical.
 - Local dev emits Cloudflare Vite-plugin certificate warnings in this environment; they do not affect the production bundle.

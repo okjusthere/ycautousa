@@ -63,6 +63,16 @@ export type VehicleImage = {
   deletedAt: string | null;
 };
 
+export type LeadNotification = {
+  status: "pending" | "sending" | "retrying" | "sent" | "failed" | "unknown";
+  recipient: string;
+  attempts: number;
+  nextAttemptAt: string | null;
+  lastErrorCode: string | null;
+  messageId: string | null;
+  updatedAt: string;
+};
+
 export type Lead = {
   id: string;
   vehicleId: string | null;
@@ -85,6 +95,7 @@ export type Lead = {
   ipHash: string | null;
   adminNotes: string | null;
   emailStatus: string | null;
+  notification?: LeadNotification | null;
   createdAt: string;
   updatedAt: string;
   vehicle?: Pick<Vehicle, "id" | "slug" | "title" | "status"> | null;

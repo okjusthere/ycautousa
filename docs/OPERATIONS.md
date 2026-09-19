@@ -2,7 +2,7 @@
 
 ## Daily / weekly
 
-- Review new leads and failed `email_status` values in `/admin/leads`.
+- Review new leads and `failed`/`unknown` notification states in `/admin/leads`.
 - Check Worker runtime logs without printing tokens, raw IPs, or customer secrets.
 - Confirm the storefront and one vehicle page after inventory changes.
 
@@ -15,4 +15,4 @@
 
 ## Incident actions
 
-If email delivery fails, leave the binding disabled and continue capturing leads in D1; inspect `email_status` and retry notification manually after fixing the sender domain. If a bad Worker is deployed, roll back to the prior deployment through Wrangler. If media transforms fail, the Worker automatically serves the original private R2 object.
+If email delivery fails, inquiries remain saved in D1. Review the lead's Email notification panel: rate/quota rejections retry automatically; `failed` needs configuration review and an explicit retry; `unknown` requires checking the mailbox before confirming a resend. Do not disable a working binding as a routine recovery step. See [notification recovery](LEAD_NOTIFICATIONS.md). If a bad Worker is deployed, roll back to the prior deployment through Wrangler. If media transforms fail, the Worker automatically serves the original private R2 object.

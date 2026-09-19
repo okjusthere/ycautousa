@@ -23,5 +23,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Browser tests must not be navigated by documentation edits or HMR reloads.
+    hmr: process.env.PLAYWRIGHT_TEST === "1" ? false : undefined,
   },
 });

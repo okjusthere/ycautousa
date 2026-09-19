@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { z } from "zod";
 
 const origin = (process.env.APP_ORIGIN ?? "").replace(/\/$/, "");
+const checkFetch: typeof fetch = (input, init) =>
+  fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
 if (!origin) {
   console.error(
     "Set APP_ORIGIN to the deployed https URL, for example APP_ORIGIN=https://preview.yc-auto.workers.dev",
@@ -60,6 +62,7 @@ const checks = [
   "/sitemap.xml",
   "/robots.txt",
 ];
+const entryAssets = new Map<string, "script" | "stylesheet">();
 
 async function validateHtml(response: Response, path: string): Promise<void> {
   if (response.status !== 200)
@@ -83,14 +86,32 @@ async function validateHtml(response: Response, path: string): Promise<void> {
   const language = path === "/zh" || path.startsWith("/zh/") ? "zh-CN" : "en";
   if (!html.includes(`<html lang="${language}"`))
     throw new Error(`expected HTML language ${language}`);
+  for (const [tag] of html.matchAll(/<(?:script|link)\b[^>]*>/gi)) {
+    const script = /^<script\b/i.test(tag);
+    const rel = tag.match(/\brel=["']([^"']+)["']/i)?.[1] ?? "";
+    if (!script && !rel.split(/\s+/).includes("stylesheet")) continue;
+    const reference = script
+      ? tag.match(/\bsrc=["']([^"']+)["']/i)?.[1]
+      : tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+    if (!reference) continue;
+    const asset = new URL(reference, `${origin}${path}`);
+    if (asset.origin === origin)
+      entryAssets.set(
+        `${asset.pathname}${asset.search}`,
+        script ? "script" : "stylesheet",
+      );
+  }
 }
 
 const results: Array<{ path: string; status: number | string; ok: boolean }> =
   [];
+let sitemapXml = "";
 if (origin) {
   for (const path of checks) {
     try {
-      const response = await fetch(`${origin}${path}`, { redirect: "manual" });
+      const response = await checkFetch(`${origin}${path}`, {
+        redirect: "manual",
+      });
       if (response.status !== 200)
         throw new Error(`expected HTTP 200, received ${response.status}`);
       const schema = apiSchemas[path];
@@ -105,6 +126,8 @@ if (origin) {
           throw new Error(
             `invalid API response: ${parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
           );
+      } else if (path === "/sitemap.xml") {
+        sitemapXml = await response.text();
       } else if (pagePaths.includes(path)) {
         await validateHtml(response, path);
       } else if (path === "/robots.txt") {
@@ -128,9 +151,7 @@ if (origin) {
   }
   const sitemap = results.find((item) => item.path === "/sitemap.xml");
   if (sitemap?.ok) {
-    const xml = await fetch(`${origin}/sitemap.xml`).then((response) =>
-      response.text(),
-    );
+    const xml = sitemapXml;
     if (!xml.includes("<urlset")) {
       sitemap.ok = false;
       sitemap.status = "invalid sitemap XML";
@@ -154,7 +175,7 @@ if (origin) {
     ].slice(0, 6);
     for (const path of vehiclePaths) {
       try {
-        const response = await fetch(`${origin}${path}`, {
+        const response = await checkFetch(`${origin}${path}`, {
           redirect: "manual",
         });
         await validateHtml(response, path);
@@ -172,9 +193,46 @@ if (origin) {
       }
     }
   }
+  for (const [path, kind] of entryAssets) {
+    try {
+      const response = await checkFetch(`${origin}${path}`, {
+        redirect: "manual",
+      });
+      if (response.status !== 200)
+        throw new Error(`expected HTTP 200, received ${response.status}`);
+      const contentType = (response.headers.get("content-type") ?? "")
+        .split(";")[0]
+        .trim()
+        .toLowerCase();
+      const expectedTypes =
+        kind === "stylesheet"
+          ? ["text/css"]
+          : [
+              "application/javascript",
+              "text/javascript",
+              "application/ecmascript",
+              "text/ecmascript",
+            ];
+      if (!expectedTypes.includes(contentType))
+        throw new Error(
+          `expected ${kind} content type, received ${contentType || "none"}`,
+        );
+      if (!(await response.text()).trim())
+        throw new Error("entry asset is empty");
+      results.push({ path, status: response.status, ok: true });
+    } catch (error) {
+      results.push({
+        path,
+        status: error instanceof Error ? error.message : "network error",
+        ok: false,
+      });
+    }
+  }
   for (const path of ["/admin", "/api/admin/dashboard"]) {
     try {
-      const admin = await fetch(`${origin}${path}`, { redirect: "manual" });
+      const admin = await checkFetch(`${origin}${path}`, {
+        redirect: "manual",
+      });
       const location = admin.headers.get("location") ?? "";
       const accessLogin = location ? new URL(location, origin) : null;
       const protectedRedirect =
@@ -197,7 +255,9 @@ if (origin) {
   }
   for (const path of ["/about", "/zh/about"]) {
     try {
-      const response = await fetch(`${origin}${path}`, { redirect: "manual" });
+      const response = await checkFetch(`${origin}${path}`, {
+        redirect: "manual",
+      });
       results.push({
         path,
         status: response.status,
@@ -216,7 +276,7 @@ if (origin) {
   }
   if (process.env.LEGACY_PATH) {
     try {
-      const legacy = await fetch(`${origin}${process.env.LEGACY_PATH}`, {
+      const legacy = await checkFetch(`${origin}${process.env.LEGACY_PATH}`, {
         redirect: "manual",
       });
       results.push({
@@ -234,7 +294,7 @@ if (origin) {
   }
   if (process.env.IMAGE_PATH) {
     try {
-      const image = await fetch(`${origin}${process.env.IMAGE_PATH}`, {
+      const image = await checkFetch(`${origin}${process.env.IMAGE_PATH}`, {
         redirect: "manual",
       });
       const contentType = image.headers.get("content-type") ?? "";

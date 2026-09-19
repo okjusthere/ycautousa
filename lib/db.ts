@@ -12,6 +12,7 @@ import type {
   InventoryFacets,
 } from "./types";
 import { nowIso, uid } from "./utils";
+import { notificationColumns, readNotification } from "./lead-delivery";
 
 export type D1Result<T = unknown> = {
   results: T[];
@@ -153,6 +154,7 @@ export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
     ipHash: nullable(row.ip_hash),
     adminNotes: nullable(row.admin_notes),
     emailStatus: nullable(row.email_status),
+    notification: readNotification(row),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     vehicle: vehicle ?? null,
@@ -489,7 +491,7 @@ export async function recentVehicles(
 export async function recentLeads(db: D1Like, limit = 8): Promise<Lead[]> {
   const rows = await db
     .prepare(
-      "SELECT l.*, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id ORDER BY l.created_at DESC LIMIT ?",
+      `SELECT l.*, ${notificationColumns}, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id LEFT JOIN lead_email_jobs n ON n.lead_id=l.id ORDER BY l.created_at DESC LIMIT ?`,
     )
     .bind(limit)
     .all<LeadRow>();
@@ -511,7 +513,7 @@ export async function recentLeads(db: D1Like, limit = 8): Promise<Lead[]> {
 export async function getLead(db: D1Like, id: string): Promise<Lead | null> {
   const row = await db
     .prepare(
-      "SELECT l.*, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id WHERE l.id = ?",
+      `SELECT l.*, ${notificationColumns}, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id LEFT JOIN lead_email_jobs n ON n.lead_id=l.id WHERE l.id = ?`,
     )
     .bind(id)
     .first<LeadRow>();
@@ -537,11 +539,11 @@ export async function listLeads(
   const statement = status
     ? db
         .prepare(
-          "SELECT l.*, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id WHERE l.status = ? ORDER BY l.created_at DESC",
+          `SELECT l.*, ${notificationColumns}, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id LEFT JOIN lead_email_jobs n ON n.lead_id=l.id WHERE l.status = ? ORDER BY l.created_at DESC`,
         )
         .bind(status)
     : db.prepare(
-        "SELECT l.*, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id ORDER BY l.created_at DESC",
+        `SELECT l.*, ${notificationColumns}, v.id AS v_id, v.slug AS v_slug, v.title AS v_title, v.status AS v_status FROM leads l LEFT JOIN vehicles v ON v.id = l.vehicle_id LEFT JOIN lead_email_jobs n ON n.lead_id=l.id ORDER BY l.created_at DESC`,
       );
   const rows = await statement.all<LeadRow>();
   return rows.results.map((row) =>
@@ -714,54 +716,6 @@ export async function putVinCache(
     .run();
 }
 
-export async function insertLead(
-  db: D1Like,
-  lead: {
-    id?: string;
-    vehicleId?: string | null;
-    leadType: string;
-    name: string;
-    phone?: string | null;
-    email?: string | null;
-    preferredContact?: string | null;
-    message?: string | null;
-    details?: Lead["details"];
-    sourceUrl?: string | null;
-    referrer?: string | null;
-    utm?: Record<string, string>;
-    country?: string | null;
-    ipHash?: string | null;
-  },
-): Promise<string> {
-  const id = lead.id ?? uid("lead");
-  const at = nowIso();
-  await db
-    .prepare(
-      "INSERT INTO leads (id,vehicle_id,lead_type,name,phone,email,preferred_contact,message,details_json,status,source_url,referrer,utm_json,cf_country,ip_hash,created_at,updated_at,email_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    )
-    .bind(
-      id,
-      lead.vehicleId ?? null,
-      lead.leadType,
-      lead.name,
-      lead.phone ?? null,
-      lead.email ?? null,
-      lead.preferredContact ?? null,
-      lead.message ?? null,
-      JSON.stringify(lead.details ?? {}),
-      "new",
-      lead.sourceUrl ?? null,
-      lead.referrer ?? null,
-      JSON.stringify(lead.utm ?? {}),
-      lead.country ?? null,
-      lead.ipHash ?? null,
-      at,
-      at,
-      "pending",
-    )
-    .run();
-  return id;
-}
 export async function updateLead(
   db: D1Like,
   id: string,
@@ -775,17 +729,6 @@ export async function updateLead(
     .bind(status ?? null, adminNotes ?? null, nowIso(), id)
     .run();
 }
-export async function updateLeadEmailStatus(
-  db: D1Like,
-  id: string,
-  status: string,
-): Promise<void> {
-  await db
-    .prepare("UPDATE leads SET email_status=?, updated_at=? WHERE id=?")
-    .bind(status, nowIso(), id)
-    .run();
-}
-
 export async function addAudit(
   db: D1Like,
   adminEmail: string,

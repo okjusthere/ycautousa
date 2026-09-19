@@ -5,6 +5,7 @@ import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/space-grotesk";
 import "./styles/global.css";
 import App from "./App";
+import { ApplicationErrorBoundary } from "../components/ApplicationErrorBoundary";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Application root is missing");
@@ -31,7 +32,9 @@ if (window.location.pathname === "/") {
 createRoot(root).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <ApplicationErrorBoundary>
+        <App />
+      </ApplicationErrorBoundary>
     </BrowserRouter>
   </StrictMode>,
 );

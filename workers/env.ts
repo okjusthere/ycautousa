@@ -2,6 +2,7 @@ import type { D1Like } from "../lib/db";
 import type {
   ImageOutputOptions,
   ImagesBinding,
+  SendEmail,
 } from "@cloudflare/workers-types";
 
 export type R2ObjectLike = {
@@ -38,15 +39,7 @@ export type ImageOutputMime = Extract<
  */
 export type ImagesBindingLike = Pick<ImagesBinding, "input">;
 
-export type EmailBindingLike = {
-  send(message: {
-    from: string;
-    to: string | string[];
-    subject: string;
-    text: string;
-    html?: string;
-  }): Promise<void>;
-};
+export type EmailBindingLike = Pick<SendEmail, "send">;
 
 export type Env = {
   DB: D1Like;

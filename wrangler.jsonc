@@ -51,6 +51,7 @@
   "env": {
     "production": {
       "name": "yc-auto-web",
+      "triggers": { "crons": ["*/5 * * * *"] },
       "workers_dev": true,
       "routes": [
         { "pattern": "www.ycautousa.com", "custom_domain": true },

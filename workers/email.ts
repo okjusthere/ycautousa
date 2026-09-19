@@ -4,13 +4,16 @@ import { escapeHtml } from "../lib/utils";
 
 export async function sendLeadNotification(
   env: Env,
-  settings: SiteSettings,
   lead: Lead,
-): Promise<"sent" | "skipped" | "failed"> {
+  to: string,
+): Promise<{ messageId: string }> {
   const binding = env.EMAIL;
   const from = env.EMAIL_FROM?.trim();
-  const to = settings.leadNotificationRecipient || env.EMAIL_TO?.trim();
-  if (!binding || !from || !to) return "skipped";
+  if (!binding || !from || !to || to !== env.EMAIL_TO?.trim())
+    throw Object.assign(
+      new Error("Email binding configuration is incomplete"),
+      { code: "CONFIGURATION_ERROR" },
+    );
   const vehicleLine = lead.vehicle
     ? `${lead.vehicle.title} (${lead.vehicle.slug})`
     : "General contact";
@@ -35,22 +38,13 @@ export async function sendLeadNotification(
     `Source: ${lead.sourceUrl ?? "—"}`,
     `Admin: ${env.APP_ORIGIN ?? ""}/admin/leads/${lead.id}`,
   ].join("\n");
-  try {
-    await binding.send({
-      from,
-      to,
-      subject: `${lead.leadType === "trade_sell" ? "New Trade/Sell request" : "New YC Auto lead"}${lead.vehicle ? ` — ${lead.vehicle.title}` : ""}`,
-      text,
-      html: `<h2>${lead.leadType === "trade_sell" ? "New Trade/Sell request" : "New YC Auto lead"}</h2><p><strong>Type:</strong> ${escapeHtml(lead.leadType)}</p><p><strong>Vehicle:</strong> ${escapeHtml(vehicleLine)}</p><p><strong>Name:</strong> ${escapeHtml(lead.name)}</p><p><strong>Phone:</strong> ${escapeHtml(lead.phone ?? "—")}</p><p><strong>Email:</strong> ${escapeHtml(lead.email ?? "—")}</p><p><strong>Preferred contact:</strong> ${escapeHtml(lead.preferredContact ?? "—")}</p>${lead.leadType === "trade_sell" ? `<p><strong>VIN:</strong> ${escapeHtml(lead.details.vin ?? "—")}</p><p><strong>Mileage:</strong> ${escapeHtml(lead.details.mileage?.toLocaleString("en-US") ?? "—")} mi</p><p><strong>WeChat:</strong> ${escapeHtml(lead.details.wechat ?? "—")}</p>` : ""}<p><strong>Message:</strong> ${escapeHtml(lead.message ?? "—")}</p><p><strong>Source:</strong> ${escapeHtml(lead.sourceUrl ?? "—")}</p><p><a href="${escapeHtml(env.APP_ORIGIN ?? "")}/admin/leads/${encodeURIComponent(lead.id)}">Open lead in admin</a></p>`,
-    });
-    return "sent";
-  } catch (error) {
-    console.error(
-      "lead notification failed",
-      error instanceof Error ? error.name : "unknown",
-    );
-    return "failed";
-  }
+  return binding.send({
+    from,
+    to,
+    subject: `${lead.leadType === "trade_sell" ? "New Trade/Sell request" : "New YC Auto lead"}${lead.vehicle ? ` — ${lead.vehicle.title}` : ""}`,
+    text,
+    html: `<h2>${lead.leadType === "trade_sell" ? "New Trade/Sell request" : "New YC Auto lead"}</h2><p><strong>Type:</strong> ${escapeHtml(lead.leadType)}</p><p><strong>Vehicle:</strong> ${escapeHtml(vehicleLine)}</p><p><strong>Name:</strong> ${escapeHtml(lead.name)}</p><p><strong>Phone:</strong> ${escapeHtml(lead.phone ?? "—")}</p><p><strong>Email:</strong> ${escapeHtml(lead.email ?? "—")}</p><p><strong>Preferred contact:</strong> ${escapeHtml(lead.preferredContact ?? "—")}</p>${lead.leadType === "trade_sell" ? `<p><strong>VIN:</strong> ${escapeHtml(lead.details.vin ?? "—")}</p><p><strong>Mileage:</strong> ${escapeHtml(lead.details.mileage?.toLocaleString("en-US") ?? "—")} mi</p><p><strong>WeChat:</strong> ${escapeHtml(lead.details.wechat ?? "—")}</p>` : ""}<p><strong>Message:</strong> ${escapeHtml(lead.message ?? "—")}</p><p><strong>Source:</strong> ${escapeHtml(lead.sourceUrl ?? "—")}</p><p><a href="${escapeHtml(env.APP_ORIGIN ?? "")}/admin/leads/${encodeURIComponent(lead.id)}">Open lead in admin</a></p>`,
+  });
 }
 
 export function customerAckMessage(

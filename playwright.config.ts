@@ -11,8 +11,10 @@ export default defineConfig({
   webServer: {
     command:
       "npm run db:migrate:local && npm run db:seed:local && npm run dev -- --host 127.0.0.1",
+    env: { PLAYWRIGHT_TEST: "1" },
     url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
+    // A manually running dev server may still have HMR enabled.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

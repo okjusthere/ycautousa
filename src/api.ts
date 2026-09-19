@@ -6,6 +6,16 @@ import type {
   Vehicle,
 } from "../lib/types";
 import { demoLeads, demoSettings, demoStats, demoVehicles } from "./demo";
+import { isRecord, requestJson as request } from "./http";
+import {
+  validDashboard,
+  validFacets,
+  validHome,
+  validInventory,
+  validMutationResponse,
+  validVehicle,
+} from "./api-contracts";
+export { ApiError, isNotFoundError } from "./http";
 
 export type InventoryResponse = {
   vehicles: Vehicle[];
@@ -14,24 +24,23 @@ export type InventoryResponse = {
   perPage: number;
 };
 
-const canUseLocalDemo = () =>
+export const canUseLocalDemo = () =>
+  import.meta.env.DEV &&
+  import.meta.env.VITE_ENABLE_DEMO === "true" &&
   typeof window !== "undefined" &&
-  /localhost|127\.0\.0\.1/.test(window.location.hostname);
+  ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const data = (await response.json().catch(() => ({}))) as T & {
-    error?: string;
-  };
-  if (!response.ok)
-    throw new Error(data?.error || `Request failed (${response.status})`);
-  return data;
+export async function getPublicConfig(
+  options?: RequestInit,
+): Promise<{ turnstileSiteKey: string }> {
+  return request(
+    "/api/public/config",
+    options,
+    (value) =>
+      isRecord(value) &&
+      typeof value.turnstileSiteKey === "string" &&
+      value.turnstileSiteKey.trim().length > 0,
+  );
 }
 
 export async function getHome(): Promise<{
@@ -40,7 +49,7 @@ export async function getHome(): Promise<{
   makes: Array<{ make: string; count: number }>;
 }> {
   try {
-    return await request("/api/public/home");
+    return await request("/api/public/home", undefined, validHome);
   } catch (error) {
     if (!canUseLocalDemo()) throw error;
     return {
@@ -53,7 +62,11 @@ export async function getHome(): Promise<{
 
 export async function getInventory(query = ""): Promise<InventoryResponse> {
   try {
-    return await request(`/api/inventory${query ? `?${query}` : ""}`);
+    return await request(
+      `/api/inventory${query ? `?${query}` : ""}`,
+      undefined,
+      validInventory,
+    );
   } catch (error) {
     if (!canUseLocalDemo()) throw error;
     const params = new URLSearchParams(query);
@@ -106,7 +119,7 @@ export async function getInventory(query = ""): Promise<InventoryResponse> {
 
 export async function getInventoryFacets(): Promise<InventoryFacets> {
   try {
-    return await request("/api/inventory/facets");
+    return await request("/api/inventory/facets", undefined, validFacets);
   } catch (error) {
     if (!canUseLocalDemo()) throw error;
     const available = demoVehicles.filter(
@@ -135,6 +148,8 @@ export async function getVehicle(
         admin
           ? `/api/admin/vehicles/${encodeURIComponent(slug)}`
           : `/api/vehicles/${encodeURIComponent(slug)}`,
+        undefined,
+        (value) => isRecord(value) && validVehicle(value.vehicle),
       )
     ).vehicle;
   } catch (error) {
@@ -153,7 +168,7 @@ export async function getDashboard(): Promise<{
   leads: Lead[];
 }> {
   try {
-    return await request("/api/admin/dashboard");
+    return await request("/api/admin/dashboard", undefined, validDashboard);
   } catch (error) {
     if (!canUseLocalDemo()) throw error;
     return { stats: demoStats, vehicles: demoVehicles, leads: demoLeads };
@@ -162,7 +177,11 @@ export async function getDashboard(): Promise<{
 
 export async function getAdminVehicles(query = ""): Promise<InventoryResponse> {
   try {
-    return await request(`/api/admin/vehicles${query ? `?${query}` : ""}`);
+    return await request(
+      `/api/admin/vehicles${query ? `?${query}` : ""}`,
+      undefined,
+      validInventory,
+    );
   } catch (error) {
     if (!canUseLocalDemo()) throw error;
     return {
@@ -184,6 +203,11 @@ export async function saveVehicle(
         ? `/api/admin/vehicles/${encodeURIComponent(id)}`
         : "/api/admin/vehicles",
       { method: id ? "PUT" : "POST", body: JSON.stringify(payload) },
+      (value) =>
+        isRecord(value) &&
+        (id
+          ? validVehicle(value.vehicle)
+          : typeof value.id === "string" && value.id.length > 0),
     );
   } catch (error) {
     if (!canUseLocalDemo()) throw error;
@@ -206,11 +230,17 @@ export async function mutate(
   path: string,
   method: string,
   body?: unknown,
+  options: RequestInit = {},
 ): Promise<any> {
-  return request(path, {
-    method,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  return request(
+    path,
+    {
+      ...options,
+      method,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
+    (value) => validMutationResponse(path, method.toUpperCase(), value),
+  );
 }
 
 export function trackEvent(

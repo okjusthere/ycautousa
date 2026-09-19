@@ -12,4 +12,4 @@ Use **Publish/Update** when the listing has a title, price, mileage, and a cover
 
 ## Leads and settings
 
-The Leads inbox shows contact, availability, and test-drive inquiries. Open a lead, call/email from the detail panel, set its status, and add notes. Leads are saved before notification email is attempted. Website Settings controls public contact details, hero/about copy, SEO defaults, and the lead recipient.
+The Leads inbox shows contact, availability, and test-drive inquiries. Open a lead, call/email from the detail panel, set its status, and add notes. Leads are saved before notification email is attempted. The Email notification panel shows delivery processing status and offers refresh/retry when appropriate. For uncertain delivery, check the mailbox and confirm before resending. See [notification recovery](LEAD_NOTIFICATIONS.md). Website Settings controls public contact details, hero/about copy, and SEO defaults; the verified notification recipient is read-only.

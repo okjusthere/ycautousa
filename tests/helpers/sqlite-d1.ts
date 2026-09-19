@@ -15,6 +15,7 @@ export class SqliteD1 implements D1Like {
       "0003_disable_sms_number.sql",
       "0004_trade_sell_and_localization.sql",
       "0005_homepage_intro.sql",
+      "0006_reliable_notifications.sql",
     ])
       this.sqlite.exec(
         readFileSync(
@@ -79,8 +80,24 @@ export class SqliteD1 implements D1Like {
       },
     };
   }
+  private batchTail: Promise<void> = Promise.resolve();
   async batch(statements: D1Statement[]): Promise<unknown> {
-    for (const statement of statements) await statement.run();
-    return [];
+    const previous = this.batchTail;
+    let release!: () => void;
+    this.batchTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    this.sqlite.exec("BEGIN");
+    try {
+      for (const statement of statements) await statement.run();
+      this.sqlite.exec("COMMIT");
+      return [];
+    } catch (error) {
+      this.sqlite.exec("ROLLBACK");
+      throw error;
+    } finally {
+      release();
+    }
   }
 }

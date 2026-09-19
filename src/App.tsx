@@ -26,12 +26,14 @@ import type {
   VehicleStatus,
 } from "../lib/types";
 import {
+  canUseLocalDemo,
   getAdminVehicles,
   getDashboard,
   getHome,
   getInventory,
   getInventoryFacets,
   getVehicle,
+  isNotFoundError,
   mutate,
   saveVehicle,
   trackEvent,
@@ -46,8 +48,13 @@ import {
   vehicleImage,
 } from "../components/VehicleCard";
 import { LeadForm } from "../components/LeadForm";
+import {
+  LeadNotificationPanel,
+  notificationLabel,
+} from "../components/LeadNotificationPanel";
 import { StaffSection } from "../components/StaffSection";
 import { modelsForMake, VEHICLE_MAKES } from "./vehicle-catalog";
+import { requestJson } from "./http";
 import {
   formatLocalizedMileage,
   formatLocalizedPrice,
@@ -152,20 +159,69 @@ function NotFound({ label }: { label?: string }) {
     </section>
   );
 }
-function ErrorBlock({ message }: { message?: string }) {
-  const { copy } = useLocale();
+function ErrorBlock({
+  message,
+  onRetry,
+  retrying = false,
+}: {
+  message?: string;
+  onRetry?: () => void;
+  retrying?: boolean;
+}) {
+  const { copy, isZh } = useLocale();
   return (
     <div className="inline-error" role="alert">
-      <Icon name="close" size={17} /> {message ?? copy.common.error}
+      <Icon name="close" size={17} />{" "}
+      <span>{message ?? copy.common.error}</span>
+      {onRetry && (
+        <button
+          className="text-button"
+          type="button"
+          onClick={onRetry}
+          disabled={retrying}
+        >
+          {retrying ? copy.common.loading : isZh ? "重试" : "Try again"}
+        </button>
+      )}
     </div>
   );
 }
 
+function useStoreSettings() {
+  const [settings, setSettings] = useState<SiteSettings>(demoSettings);
+  const [settingsError, setSettingsError] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setSettingsLoading(true);
+    getHome()
+      .then((data) => {
+        if (!active) return;
+        setSettings(data.settings);
+        setSettingsError(false);
+      })
+      .catch(() => {
+        if (active) setSettingsError(true);
+      })
+      .finally(() => {
+        if (active) setSettingsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
+  return {
+    settings,
+    settingsError,
+    settingsLoading,
+    retrySettings: () => setAttempt((value) => value + 1),
+  };
+}
+
 function HomePage() {
   const { copy, isZh, path } = useLocale();
-  const localDemo =
-    typeof window !== "undefined" &&
-    /localhost|127\.0\.0\.1/.test(window.location.hostname);
+  const localDemo = canUseLocalDemo();
   const [data, setData] = useState<{
     settings: SiteSettings;
     featured: Vehicle[];
@@ -178,6 +234,8 @@ function HomePage() {
     makes: [],
   });
   const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   usePageMeta(
     isZh ? data.settings.seoTitleZh || "YC Auto USA" : data.settings.seoTitle,
     isZh
@@ -185,10 +243,24 @@ function HomePage() {
       : data.settings.seoDescription,
   );
   useEffect(() => {
+    let active = true;
+    setLoading(true);
     getHome()
-      .then(setData)
-      .catch(() => setLoadError(copy.home.unavailable));
-  }, [copy.home.unavailable]);
+      .then((result) => {
+        if (!active) return;
+        setData(result);
+        setLoadError("");
+      })
+      .catch(() => {
+        if (active) setLoadError(copy.home.unavailable);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [copy.home.unavailable, attempt]);
   const settings = data.settings;
   const heroTitle = isZh
     ? settings.heroTitleZh || copy.home.title
@@ -202,9 +274,12 @@ function HomePage() {
   return (
     <>
       {loadError && (
-        <div className="container inline-error">
-          <Icon name="close" size={17} />
-          {loadError}
+        <div className="container">
+          <ErrorBlock
+            message={loadError}
+            onRetry={() => setAttempt((value) => value + 1)}
+            retrying={loading}
+          />
         </div>
       )}
       <script
@@ -401,6 +476,8 @@ function InventoryPage() {
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [facetsError, setFacetsError] = useState(false);
   const [facets, setFacets] = useState<{
     makes: Array<{ make: string; count: number }>;
     years: number[];
@@ -410,10 +487,20 @@ function InventoryPage() {
   const query = normalizedParams.toString();
   usePageMeta(copy.inventory.metaTitle, copy.inventory.metaDescription);
   useEffect(() => {
+    let active = true;
     getInventoryFacets()
-      .then(setFacets)
-      .catch(() => setFacets({ makes: [], years: [] }));
-  }, []);
+      .then((result) => {
+        if (!active) return;
+        setFacets(result);
+        setFacetsError(false);
+      })
+      .catch(() => {
+        if (active) setFacetsError(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
   useEffect(() => {
     if (!searchParams.has("model")) return;
     const next = new URLSearchParams(searchParams);
@@ -444,7 +531,7 @@ function InventoryPage() {
     return () => {
       active = false;
     };
-  }, [query, copy.inventory.loadError, isZh]);
+  }, [query, copy.inventory.loadError, isZh, attempt]);
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -487,6 +574,17 @@ function InventoryPage() {
               <Icon name="close" size={18} />
             </button>
           </div>
+          {facetsError && (
+            <ErrorBlock
+              message={
+                isZh
+                  ? "部分筛选条件暂时无法加载。"
+                  : "Some filters could not be loaded."
+              }
+              onRetry={() => setAttempt((value) => value + 1)}
+              retrying={loading}
+            />
+          )}
           <FilterControls
             params={searchParams}
             update={update}
@@ -534,7 +632,10 @@ function InventoryPage() {
           {loading ? (
             <Loading label={copy.inventory.loading} />
           ) : loadError ? (
-            <ErrorBlock message={loadError} />
+            <ErrorBlock
+              message={loadError}
+              onRetry={() => setAttempt((value) => value + 1)}
+            />
           ) : data && data.vehicles.length > 0 ? (
             <>
               <div className="vehicle-grid">
@@ -750,7 +851,8 @@ function VehicleDetailPage() {
   const { copy, isZh, locale, path } = useLocale();
   const { slug = "" } = useParams();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-  const [settings, setSettings] = useState<SiteSettings>(demoSettings);
+  const { settings, settingsError, settingsLoading, retrySettings } =
+    useStoreSettings();
   const [similar, setSimilar] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
@@ -758,6 +860,8 @@ function VehicleDetailPage() {
     "availability" | "test_drive" | null
   >(null);
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const touchStart = useRef<number | null>(null);
   usePageMeta(
     vehicle
@@ -770,6 +874,12 @@ function VehicleDetailPage() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    setError("");
+    setNotFound(false);
+    setVehicle(null);
+    setSimilar([]);
+    setActiveImage(0);
+    setFormType(null);
     getVehicle(slug)
       .then((value) => {
         if (alive) {
@@ -779,10 +889,11 @@ function VehicleDetailPage() {
       })
       .catch((reason) => {
         if (alive) {
+          setNotFound(isNotFoundError(reason));
           setError(
             !isZh && reason instanceof Error
               ? reason.message
-              : copy.detail.notFound,
+              : copy.common.error,
           );
           setLoading(false);
         }
@@ -790,25 +901,27 @@ function VehicleDetailPage() {
     return () => {
       alive = false;
     };
-  }, [slug, copy.detail.notFound, isZh]);
-  useEffect(() => {
-    getHome()
-      .then((data) => setSettings(data.settings))
-      .catch(() => undefined);
-  }, []);
+  }, [slug, copy.common.error, isZh, attempt]);
   useEffect(() => {
     if (!vehicle?.make) return;
+    let active = true;
     getInventory(`make=${encodeURIComponent(vehicle.make)}&perPage=12`)
-      .then((result) =>
-        setSimilar(
-          result.vehicles
-            .filter(
-              (item) => item.id !== vehicle.id && item.status === "available",
-            )
-            .slice(0, 3),
-        ),
-      )
-      .catch(() => setSimilar([]));
+      .then((result) => {
+        if (active)
+          setSimilar(
+            result.vehicles
+              .filter(
+                (item) => item.id !== vehicle.id && item.status === "available",
+              )
+              .slice(0, 3),
+          );
+      })
+      .catch(() => {
+        if (active) setSimilar([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [vehicle]);
   if (loading)
     return (
@@ -816,8 +929,16 @@ function VehicleDetailPage() {
         <Loading label={copy.detail.loading} />
       </div>
     );
+  if (notFound) return <NotFound label={copy.detail.notFound} />;
   if (!vehicle || error)
-    return <NotFound label={error || copy.detail.notFound} />;
+    return (
+      <section className="container empty-page">
+        <ErrorBlock
+          message={error || copy.common.error}
+          onRetry={() => setAttempt((value) => value + 1)}
+        />
+      </section>
+    );
   const images = vehicle.images?.length ? vehicle.images : [];
   const image = images[activeImage] ?? images[0];
   const imageSrc = image?.r2Key
@@ -866,6 +987,11 @@ function VehicleDetailPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structured) }}
       />
       <section className="detail-page">
+        {settingsError && (
+          <div className="container">
+            <ErrorBlock onRetry={retrySettings} retrying={settingsLoading} />
+          </div>
+        )}
         <div className="container detail-breadcrumb">
           <Link to={path("/inventory")}>{copy.detail.inventory}</Link>
           <span>/</span>
@@ -1234,11 +1360,9 @@ function LocationMap({ settings }: { settings: SiteSettings }) {
 function ContactPage() {
   const { copy, isZh } = useLocale();
   const { hash } = useLocation();
-  const [settings, setSettings] = useState(demoSettings);
+  const { settings, settingsError, settingsLoading, retrySettings } =
+    useStoreSettings();
   usePageMeta(copy.contact.metaTitle, copy.contact.metaDescription);
-  useEffect(() => {
-    getHome().then((data) => setSettings(data.settings));
-  }, []);
   useEffect(() => {
     if (
       ![
@@ -1258,6 +1382,11 @@ function ContactPage() {
   return (
     <>
       <section className="contact-page contact-page--combined">
+        {settingsError && (
+          <div className="container">
+            <ErrorBlock onRetry={retrySettings} retrying={settingsLoading} />
+          </div>
+        )}
         <div className="container contact-head">
           <div>
             <p className="eyebrow">{copy.contact.eyebrow}</p>
@@ -1329,13 +1458,9 @@ function ContactPage() {
 
 function TradeSellPage() {
   const { copy } = useLocale();
-  const [settings, setSettings] = useState(demoSettings);
+  const { settings, settingsError, settingsLoading, retrySettings } =
+    useStoreSettings();
   usePageMeta(copy.trade.metaTitle, copy.trade.metaDescription);
-  useEffect(() => {
-    getHome()
-      .then((data) => setSettings(data.settings))
-      .catch(() => undefined);
-  }, []);
   const steps = [
     ["01", copy.trade.step1, copy.trade.step1Copy],
     ["02", copy.trade.step2, copy.trade.step2Copy],
@@ -1344,6 +1469,11 @@ function TradeSellPage() {
   return (
     <>
       <section className="trade-page">
+        {settingsError && (
+          <div className="container">
+            <ErrorBlock onRetry={retrySettings} retrying={settingsLoading} />
+          </div>
+        )}
         <div className="container trade-hero">
           <div>
             <p className="eyebrow">{copy.trade.eyebrow}</p>
@@ -2254,6 +2384,32 @@ async function resizeImageForUpload(file: File): Promise<File> {
   }
 }
 
+type PhotoChange = { order: string[]; coverId: string };
+
+async function photoRequest(
+  path: string,
+  init?: RequestInit,
+): Promise<{ images?: VehicleImage[]; image?: VehicleImage }> {
+  return requestJson<{ images?: VehicleImage[]; image?: VehicleImage }>(path, {
+    ...init,
+    timeoutMs: 30_000,
+  });
+}
+
+function savedPhotoList(result: { images?: VehicleImage[] }): VehicleImage[] {
+  if (!Array.isArray(result.images))
+    throw new Error("The saved photo list could not be confirmed.");
+  return result.images;
+}
+
+function matchesPhotoChange(images: VehicleImage[], change: PhotoChange) {
+  return (
+    images.length === change.order.length &&
+    images.every((image, index) => image.id === change.order[index]) &&
+    images.find((image) => image.isCover)?.id === change.coverId
+  );
+}
+
 function AdminVehicleEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -2270,6 +2426,13 @@ function AdminVehicleEditorPage() {
   const [uploading, setUploading] = useState(0);
   const [failedUploads, setFailedUploads] = useState<FailedUpload[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [photosBusy, setPhotosBusy] = useState(false);
+  const [photoSyncRequired, setPhotoSyncRequired] = useState(false);
+  const [pendingPhotoChange, setPendingPhotoChange] =
+    useState<PhotoChange | null>(null);
+  const photoLock = useRef(false);
+  const photosRef = useRef<VehicleImage[]>([]);
+  const photosDisabled = photosBusy || photoSyncRequired || saving || deleting;
   usePageMeta(
     `${isNew ? "Add vehicle" : "Edit vehicle"} | YC Auto USA`,
     undefined,
@@ -2280,6 +2443,8 @@ function AdminVehicleEditorPage() {
       getVehicle(id, true)
         .then((vehicle) => {
           setState(editorFromVehicle(vehicle));
+          photosRef.current = vehicle.images ?? [];
+          setPhotoSyncRequired(false);
           setPreviewSlug(vehicle.slug);
           setLoading(false);
         })
@@ -2371,6 +2536,7 @@ function AdminVehicleEditorPage() {
   }
   async function save(event: FormEvent, statusOverride?: VehicleStatus) {
     event.preventDefault();
+    if (photoLock.current || photoSyncRequired || saving || deleting) return;
     const targetStatus = statusOverride ?? state.status;
     setSaving(true);
     setError("");
@@ -2423,7 +2589,7 @@ function AdminVehicleEditorPage() {
     }
   }
   async function removeVehicle() {
-    if (isNew || !id) return;
+    if (isNew || !id || photoLock.current || saving || deleting) return;
     if (
       !window.confirm(
         `Remove ${state.title || "this vehicle"} from inventory? This keeps its audit history but removes it from the storefront and admin inventory.`,
@@ -2442,6 +2608,123 @@ function AdminVehicleEditorPage() {
       setDeleting(false);
     }
   }
+  function applySavedPhotos(images: VehicleImage[]) {
+    photosRef.current = images;
+    setState((old) => ({ ...old, images }));
+  }
+  function beginPhotoOperation(allowReload = false) {
+    if (
+      photoLock.current ||
+      saving ||
+      deleting ||
+      (photoSyncRequired && !allowReload)
+    )
+      return false;
+    photoLock.current = true;
+    setPhotosBusy(true);
+    setDragIndex(null);
+    setPhotoError("");
+    setMessage("");
+    return true;
+  }
+  function endPhotoOperation() {
+    photoLock.current = false;
+    setPhotosBusy(false);
+    setUploading(0);
+  }
+  async function loadSavedPhotos(vehicleId: string) {
+    const images = savedPhotoList(
+      await photoRequest(`/api/admin/vehicles/${vehicleId}/images`),
+    );
+    applySavedPhotos(images);
+    setPhotoSyncRequired(false);
+    return images;
+  }
+  async function recoverPhotos(
+    vehicleId: string,
+    detail: string,
+    change: PhotoChange | null = null,
+  ) {
+    setPendingPhotoChange(change);
+    try {
+      const images = await loadSavedPhotos(vehicleId);
+      if (change && matchesPhotoChange(images, change)) {
+        setPendingPhotoChange(null);
+        setPhotoError("");
+        setMessage("Photo changes saved and verified.");
+        return;
+      }
+      setPhotoError(
+        `${detail} Saved photos have been reloaded. You can retry.`,
+      );
+    } catch {
+      setPhotoSyncRequired(true);
+      setPhotoError(
+        `${detail} Reload saved photos before making another photo change.`,
+      );
+    }
+  }
+  async function reloadPhotos() {
+    if (!id || !beginPhotoOperation(true)) return;
+    try {
+      const images = await loadSavedPhotos(id);
+      if (pendingPhotoChange && matchesPhotoChange(images, pendingPhotoChange))
+        setPendingPhotoChange(null);
+      setMessage("Saved photos reloaded. Review them before retrying.");
+    } catch (reason) {
+      setPhotoSyncRequired(true);
+      setPhotoError(
+        reason instanceof Error ? reason.message : "Unable to reload photos.",
+      );
+    } finally {
+      endPhotoOperation();
+    }
+  }
+  async function persistPhotoChange(change: PhotoChange) {
+    if (!id || !beginPhotoOperation()) return;
+    setPendingPhotoChange(null);
+    const previous: PhotoChange = {
+      order: photosRef.current.map((image) => image.id),
+      coverId: photosRef.current.find((image) => image.isCover)?.id ?? "",
+    };
+    try {
+      // Retry only against a current list so deleted/new photos cannot be lost.
+      const current = await loadSavedPhotos(id);
+      if (matchesPhotoChange(current, change)) {
+        setMessage("Photo changes saved and verified.");
+        return;
+      }
+      if (
+        !matchesPhotoChange(current, previous) ||
+        current.length !== change.order.length ||
+        current.some((image) => !change.order.includes(image.id))
+      ) {
+        setPhotoError(
+          "The photo list changed. Review the saved photos and try again.",
+        );
+        return;
+      }
+      const images = savedPhotoList(
+        await photoRequest(`/api/admin/vehicles/${id}/images`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(change),
+        }),
+      );
+      applySavedPhotos(images);
+      setMessage("Photo changes saved.");
+    } catch (reason) {
+      await recoverPhotos(
+        id,
+        reason instanceof Error
+          ? reason.message
+          : "Unable to save photo changes.",
+        change,
+      );
+    } finally {
+      endPhotoOperation();
+    }
+  }
   async function uploadOne(file: File, vehicleId: string): Promise<void> {
     if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type))
       throw new Error("Use a JPEG, PNG, or WebP image.");
@@ -2450,34 +2733,20 @@ function AdminVehicleEditorPage() {
       throw new Error("The resized image is still over the 12 MB limit.");
     const form = new FormData();
     form.append("file", prepared);
-    const response = await fetch(`/api/admin/vehicles/${vehicleId}/images`, {
-      method: "POST",
-      body: form,
-    });
-    const contentType = response.headers.get("content-type") ?? "";
-    if (response.redirected || !contentType.includes("application/json"))
-      throw new Error(
-        response.status === 413
-          ? "The uploaded image is too large."
-          : "Your admin session may have expired. Refresh and sign in again.",
-      );
-    const result = (await response.json()) as {
-      error?: string;
-      image?: VehicleImage;
-    };
-    if (!response.ok) throw new Error(result.error || "Image upload failed.");
+    const result = await photoRequest(
+      `/api/admin/vehicles/${vehicleId}/images`,
+      {
+        method: "POST",
+        body: form,
+      },
+    );
     if (!result.image) throw new Error("The upload finished without an image.");
-    setState((old) => ({
-      ...old,
-      images: [...old.images, result.image as VehicleImage],
-    }));
   }
   async function uploadFiles(files: File[]) {
-    if (!files.length) return;
+    if (!files.length || !beginPhotoOperation()) return;
     const failures: FailedUpload[] = [];
+    setPendingPhotoChange(null);
     setError("");
-    setPhotoError("");
-    setFailedUploads([]);
     setUploading(1);
     let target: { vehicleId: string; created: boolean };
     try {
@@ -2489,7 +2758,7 @@ function AdminVehicleEditorPage() {
           : "Unable to prepare this listing for photos.";
       setPhotoError(detail);
       setError(detail);
-      setUploading(0);
+      endPhotoOperation();
       return;
     }
     for (let index = 0; index < files.length; index += 1) {
@@ -2505,10 +2774,10 @@ function AdminVehicleEditorPage() {
         setUploading(Math.round(((index + 1) / files.length) * 100));
       }
     }
-    setFailedUploads(failures);
+    setFailedUploads((old) => [...old, ...failures]);
     if (failures.length) {
       setPhotoError(
-        `${failures.length} photo${failures.length === 1 ? "" : "s"} could not be uploaded. See the reason below.`,
+        `${failures.length} photo${failures.length === 1 ? "" : "s"} could not be confirmed. Check the saved photos before retrying below.`,
       );
     } else {
       setPhotoError("");
@@ -2516,96 +2785,110 @@ function AdminVehicleEditorPage() {
         `${files.length} photo${files.length === 1 ? "" : "s"} uploaded successfully.`,
       );
     }
+    try {
+      await loadSavedPhotos(target.vehicleId);
+    } catch {
+      setPhotoSyncRequired(true);
+      setPhotoError(
+        "Uploads finished, but the photo list could not be confirmed. Reload saved photos before continuing.",
+      );
+      setMessage("");
+    } finally {
+      endPhotoOperation();
+    }
     if (target.created)
       navigate(`/admin/vehicles/${target.vehicleId}`, { replace: true });
   }
   async function upload(event: ChangeEvent<HTMLInputElement>) {
-    await uploadFiles(event.target.files ? Array.from(event.target.files) : []);
-    event.target.value = "";
+    const input = event.currentTarget;
+    const files = input.files ? Array.from(input.files) : [];
+    input.value = "";
+    await uploadFiles(files);
   }
   async function dropFiles(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     await uploadFiles(Array.from(event.dataTransfer.files));
   }
   async function retryUpload(failure: FailedUpload) {
-    if (!id || isNew) return;
+    if (!id || isNew || !beginPhotoOperation()) return;
+    setPendingPhotoChange(null);
+    setUploading(1);
     try {
       await uploadOne(failure.file, id);
-      const remaining = failedUploads.filter((item) => item !== failure);
-      setFailedUploads(remaining);
-      if (!remaining.length) setPhotoError("");
+      setFailedUploads((old) => old.filter((item) => item !== failure));
+      await loadSavedPhotos(id);
       setError("");
+      setMessage("Photo uploaded successfully.");
     } catch (reason) {
       const detail =
         reason instanceof Error ? reason.message : "Image upload failed.";
-      setPhotoError(detail);
+      await recoverPhotos(
+        id,
+        `${detail} Check saved photos before retrying the upload.`,
+      );
       setFailedUploads((old) =>
         old.map((item) =>
           item === failure ? { ...item, reason: detail } : item,
         ),
       );
+    } finally {
+      endPhotoOperation();
     }
   }
   async function removeImage(image: VehicleImage) {
+    if (!id || photoLock.current || photosDisabled) return;
     if (!window.confirm("Remove this image from the vehicle?")) return;
+    if (!beginPhotoOperation()) return;
+    setPendingPhotoChange(null);
     try {
-      await mutate(`/api/admin/images/${image.id}`, "DELETE");
-      set(
-        "images",
-        state.images.filter((item) => item.id !== image.id),
-      );
+      await photoRequest(`/api/admin/images/${image.id}`, { method: "DELETE" });
+      await loadSavedPhotos(id);
+      setMessage("Photo removed. Saved order and cover updated.");
     } catch (reason) {
-      setError(
+      await recoverPhotos(
+        id,
         reason instanceof Error ? reason.message : "Unable to remove image.",
       );
+    } finally {
+      endPhotoOperation();
     }
   }
   async function reorder(index: number, direction: -1 | 1) {
-    const next = [...state.images];
+    if (photoLock.current || photosDisabled) return;
+    const next = [...photosRef.current];
     const swap = index + direction;
     if (swap < 0 || swap >= next.length || !id) return;
     [next[index], next[swap]] = [next[swap], next[index]];
-    set("images", next);
-    try {
-      await mutate(`/api/admin/vehicles/${id}/images`, "PUT", {
-        order: next.map((item) => item.id),
-        coverId: next.find((item) => item.isCover)?.id ?? next[0]?.id,
-      });
-    } catch {
-      setMessage("Order will sync when the vehicle is saved.");
-    }
+    await persistPhotoChange({
+      order: next.map((item) => item.id),
+      coverId: next.find((item) => item.isCover)?.id ?? next[0].id,
+    });
   }
   async function setCover(image: VehicleImage) {
-    if (!id) return;
-    const next = state.images.map((item) => ({
-      ...item,
-      isCover: item.id === image.id,
-    }));
-    set("images", next);
-    try {
-      await mutate(`/api/admin/vehicles/${id}/images`, "PUT", {
-        order: next.map((item) => item.id),
-        coverId: image.id,
-      });
-    } catch {
-      setError("Unable to set cover image.");
-    }
+    if (photoLock.current || photosDisabled) return;
+    await persistPhotoChange({
+      order: photosRef.current.map((item) => item.id),
+      coverId: image.id,
+    });
   }
   async function dropImage(targetIndex: number) {
-    if (dragIndex === null || dragIndex === targetIndex || !id) return;
-    const next = [...state.images];
+    if (
+      photoLock.current ||
+      photosDisabled ||
+      dragIndex === null ||
+      dragIndex === targetIndex ||
+      !id
+    )
+      return;
+    const next = [...photosRef.current];
     const [moved] = next.splice(dragIndex, 1);
+    if (!moved) return;
     next.splice(targetIndex, 0, moved);
-    set("images", next);
     setDragIndex(null);
-    try {
-      await mutate(`/api/admin/vehicles/${id}/images`, "PUT", {
-        order: next.map((item) => item.id),
-        coverId: next.find((item) => item.isCover)?.id ?? next[0]?.id,
-      });
-    } catch {
-      setMessage("Order will sync when the vehicle is saved.");
-    }
+    await persistPhotoChange({
+      order: next.map((item) => item.id),
+      coverId: next.find((item) => item.isCover)?.id ?? next[0].id,
+    });
   }
   if (loading) return <Loading label="Loading vehicle" />;
   return (
@@ -2633,14 +2916,14 @@ function AdminVehicleEditorPage() {
           </Link>
           <button
             className="button button--dark"
-            disabled={saving}
+            disabled={photosDisabled}
             onClick={(event) => save(event, "draft")}
           >
             Save draft
           </button>
           <button
             className="button button--red"
-            disabled={saving}
+            disabled={photosDisabled}
             onClick={(event) =>
               save(event, state.status === "draft" ? "available" : undefined)
             }
@@ -2897,13 +3180,14 @@ function AdminVehicleEditorPage() {
           </div>
           <label
             className="upload-drop"
+            aria-disabled={photosDisabled}
             onDragOver={(event) => event.preventDefault()}
             onDrop={dropFiles}
           >
             <Icon name="upload" size={24} />
             <strong>Drop photos here or choose files</strong>
             <span>
-              {uploading > 0 && uploading < 100
+              {uploading > 0
                 ? `Uploading ${uploading}%…`
                 : isNew
                   ? "Your first upload will create a private draft automatically."
@@ -2913,7 +3197,7 @@ function AdminVehicleEditorPage() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
-              disabled={saving || (uploading > 0 && uploading < 100)}
+              disabled={photosDisabled}
               onChange={upload}
             />
           </label>
@@ -2921,6 +3205,33 @@ function AdminVehicleEditorPage() {
             <p className="upload-inline-error" role="alert">
               {photoError}
             </p>
+          )}
+          {photosBusy && (
+            <p role="status">
+              {uploading
+                ? "Uploading and checking saved photos…"
+                : "Saving and checking photos…"}
+            </p>
+          )}
+          {photoSyncRequired && (
+            <button
+              type="button"
+              className="button button--ghost"
+              disabled={photosBusy || saving || deleting}
+              onClick={reloadPhotos}
+            >
+              Reload saved photos
+            </button>
+          )}
+          {pendingPhotoChange && !photoSyncRequired && (
+            <button
+              type="button"
+              className="button button--ghost"
+              disabled={photosDisabled}
+              onClick={() => persistPhotoChange(pendingPhotoChange)}
+            >
+              Retry photo change
+            </button>
           )}
           {failedUploads.length > 0 && (
             <div className="upload-retry-list" role="status">
@@ -2936,7 +3247,11 @@ function AdminVehicleEditorPage() {
                   <span>
                     {failure.file.name}: {failure.reason}
                   </span>
-                  <button type="button" onClick={() => retryUpload(failure)}>
+                  <button
+                    type="button"
+                    disabled={photosDisabled}
+                    onClick={() => retryUpload(failure)}
+                  >
                     Retry <Icon name="arrow" size={14} />
                   </button>
                 </div>
@@ -2944,13 +3259,17 @@ function AdminVehicleEditorPage() {
             </div>
           )}
           {state.images.length > 0 && (
-            <div className="image-manager">
+            <div className="image-manager" aria-busy={photosBusy}>
               {state.images.map((image, index) => (
                 <div
                   className={`image-manager-item ${image.isCover ? "is-cover" : ""}`}
                   key={image.id}
-                  draggable
-                  onDragStart={() => setDragIndex(index)}
+                  draggable={!photosDisabled}
+                  onDragStart={() => {
+                    if (!photoLock.current && !photosDisabled)
+                      setDragIndex(index);
+                  }}
+                  onDragEnd={() => setDragIndex(null)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => dropImage(index)}
                 >
@@ -2977,7 +3296,7 @@ function AdminVehicleEditorPage() {
                     <button
                       type="button"
                       onClick={() => setCover(image)}
-                      disabled={image.isCover}
+                      disabled={photosDisabled || image.isCover}
                     >
                       {image.isCover ? "Cover" : "Set cover"}
                     </button>
@@ -2985,7 +3304,7 @@ function AdminVehicleEditorPage() {
                       type="button"
                       className="icon-button"
                       onClick={() => reorder(index, -1)}
-                      disabled={index === 0}
+                      disabled={photosDisabled || index === 0}
                       aria-label="Move image up"
                     >
                       ↑
@@ -2994,7 +3313,9 @@ function AdminVehicleEditorPage() {
                       type="button"
                       className="icon-button"
                       onClick={() => reorder(index, 1)}
-                      disabled={index === state.images.length - 1}
+                      disabled={
+                        photosDisabled || index === state.images.length - 1
+                      }
                       aria-label="Move image down"
                     >
                       ↓
@@ -3002,6 +3323,7 @@ function AdminVehicleEditorPage() {
                     <button
                       type="button"
                       className="icon-button danger"
+                      disabled={photosDisabled}
                       onClick={() => removeImage(image)}
                       aria-label="Remove image"
                     >
@@ -3078,7 +3400,7 @@ function AdminVehicleEditorPage() {
               <button
                 type="button"
                 className="button button--dark"
-                disabled={saving}
+                disabled={photosDisabled}
                 onClick={(event) => save(event, "draft")}
               >
                 Save as draft
@@ -3086,7 +3408,7 @@ function AdminVehicleEditorPage() {
               <button
                 type="button"
                 className="button button--red"
-                disabled={saving}
+                disabled={photosDisabled}
                 onClick={(event) =>
                   save(
                     event,
@@ -3117,7 +3439,7 @@ function AdminVehicleEditorPage() {
             <button
               type="button"
               className="button button--danger"
-              disabled={deleting}
+              disabled={deleting || saving || photosBusy}
               onClick={removeVehicle}
             >
               <Icon name="trash" size={16} />
@@ -3178,6 +3500,18 @@ function AdminLeadsPage() {
       });
   };
   useEffect(load, [filter, leadId]);
+  function updateNotification(updated: Lead) {
+    const merge = (lead: Lead) =>
+      lead.id === updated.id
+        ? {
+            ...lead,
+            emailStatus: updated.emailStatus,
+            notification: updated.notification,
+          }
+        : lead;
+    setLeads((old) => old.map(merge));
+    setSelected((old) => (old ? merge(old) : null));
+  }
   async function saveLead(next: Lead) {
     try {
       const result = await mutate(`/api/admin/leads/${next.id}`, "PATCH", {
@@ -3247,6 +3581,7 @@ function AdminLeadsPage() {
                         ? `VIN ${lead.details.vin}`
                         : "No message provided.")}
                   </p>
+                  <small>Email: {notificationLabel(lead.emailStatus)}</small>
                 </span>
                 <span className={`lead-status lead-status--${lead.status}`}>
                   {lead.status}
@@ -3262,7 +3597,12 @@ function AdminLeadsPage() {
           </div>
           <div className="lead-detail">
             {selected ? (
-              <LeadDetail lead={selected} onSave={saveLead} />
+              <LeadDetail
+                key={selected.id}
+                lead={selected}
+                onSave={saveLead}
+                onNotificationUpdate={updateNotification}
+              />
             ) : (
               <div className="panel-empty">
                 <Icon name="message" size={24} />
@@ -3287,12 +3627,24 @@ function AdminLeadsPage() {
 function LeadDetail({
   lead,
   onSave,
+  onNotificationUpdate,
 }: {
   lead: Lead;
   onSave: (lead: Lead) => void;
+  onNotificationUpdate: (lead: Lead) => void;
 }) {
   const [draft, setDraft] = useState(lead);
-  useEffect(() => setDraft(lead), [lead]);
+  const { status: savedStatus, adminNotes: savedNotes } = lead;
+  // Mail polling must not overwrite an administrator's unsaved notes or status.
+  useEffect(
+    () =>
+      setDraft((old) => ({
+        ...old,
+        status: savedStatus,
+        adminNotes: savedNotes,
+      })),
+    [savedStatus, savedNotes],
+  );
   return (
     <div>
       <div className="lead-detail-head">
@@ -3360,6 +3712,7 @@ function LeadDetail({
         <span>Message</span>
         <p>{lead.message || "No message provided."}</p>
       </div>
+      <LeadNotificationPanel lead={lead} onUpdate={onNotificationUpdate} />
       <Field label="Lead status">
         <select
           value={draft.status}
@@ -3393,6 +3746,9 @@ function LeadDetail({
 
 function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettings>(demoSettings);
+  const [notificationRecipient, setNotificationRecipient] = useState<
+    string | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -3402,6 +3758,7 @@ function AdminSettingsPage() {
     mutate("/api/admin/settings", "GET")
       .then((result) => {
         setSettings(result.settings ?? demoSettings);
+        setNotificationRecipient(result.notificationRecipient ?? null);
         setLoadError("");
         setLoading(false);
       })
@@ -3494,11 +3851,18 @@ function AdminSettingsPage() {
               <input
                 type="email"
                 value={settings.leadNotificationRecipient}
+                readOnly={!!notificationRecipient}
+                aria-describedby="notification-recipient-help"
                 onChange={(event) =>
                   set("leadNotificationRecipient", event.target.value)
                 }
                 required
               />
+              <small id="notification-recipient-help">
+                {notificationRecipient
+                  ? "Verified delivery address. Changing it requires updating the mail service recipient and deployment configuration."
+                  : "Use the verified recipient configured for the mail service."}
+              </small>
             </Field>
             <Field label="Address" required>
               <input

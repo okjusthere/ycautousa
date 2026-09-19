@@ -32,6 +32,8 @@ export function Wordmark({ inverse = false }: { inverse?: boolean }) {
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<SiteSettings>(demoSettings);
+  const [settingsError, setSettingsError] = useState(false);
+  const [settingsAttempt, setSettingsAttempt] = useState(0);
   const location = useLocation();
   const { copy, path, switchPath, locale } = useLocale();
   const rememberLanguage = () => {
@@ -43,13 +45,19 @@ export function PublicLayout() {
   };
   useEffect(() => {
     let alive = true;
-    getHome().then((data) => {
-      if (alive) setSettings(data.settings);
-    });
+    getHome()
+      .then((data) => {
+        if (!alive) return;
+        setSettings(data.settings);
+        setSettingsError(false);
+      })
+      .catch(() => {
+        if (alive) setSettingsError(true);
+      });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [settingsAttempt]);
   useEffect(() => setOpen(false), [location.pathname]);
   useEffect(() => {
     document.documentElement.dataset.route = location.pathname;
@@ -121,6 +129,22 @@ export function PublicLayout() {
       <main id="main-content">
         <Outlet />
       </main>
+      {settingsError && (
+        <div className="container inline-error" role="status">
+          <span>
+            {locale === "zh"
+              ? "联系信息暂时无法更新，以下显示已确认的门店信息。"
+              : "Contact details could not be refreshed. Previously confirmed store details are shown below."}
+          </span>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => setSettingsAttempt((value) => value + 1)}
+          >
+            {locale === "zh" ? "重试" : "Try again"}
+          </button>
+        </div>
+      )}
       <PublicFooter settings={settings} />
     </div>
   );
