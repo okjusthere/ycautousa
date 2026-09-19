@@ -26,17 +26,19 @@ All code, local runtime, E2E, production-bundle, deployment, and live-site check
 npm run format:check   PASS
 npm run lint           PASS (0 errors, max-warnings 0)
 npm run typecheck      PASS
-npm run test           PASS — 9 files, 36 tests
+npm run test           PASS — 10 files, 39 tests
 npm run test:e2e       PASS — 36 tests across Chromium + mobile
 npm run build          PASS — client + Worker production bundle
 npm audit (prod)       PASS — 0 vulnerabilities
 npm run deploy         PASS — Worker and assets deployed to Cloudflare
-verify:prod            PASS — public pages, five vehicle pages, sitemap, robots, and Cloudflare Access redirect
+verify:prod            PASS — public pages, six vehicle pages, four JSON APIs, media, redirects, sitemap, robots, and Cloudflare Access protection
 ```
 
 `npm ci --ignore-scripts` was also run successfully from the lockfile before the final verification pass.
 
 The UI was also visually smoke-checked with Playwright screenshots at desktop and phone widths. Local D1 migrations and seed commands completed successfully.
+
+After domain cutover, an explicit Assets routing list containing only `/` and `/index.html` caused API requests to return the SPA HTML shell with status 200, leaving the React page blank. The routing now runs the Worker for all application paths and excludes only static assets. The live Chinese homepage, 35-vehicle inventory API, and transformed images were verified after the fix. Production verification now checks JSON content types and response structures, page canonical/language metadata, and protected admin API responses. Three regression tests reject the incident's HTML-200 response, invalid JSON structures, and missing page canonical metadata. Formatting, lint, TypeScript, all 39 tests, and the enhanced live checks passed for this repair; earlier E2E results above were not rerun for this configuration-only fix.
 
 Contact now combines company information, Our Story, a nine-person bilingual staff directory, the map, and the existing contact form. Staff photos and details come from the supplied Meet Our Staff document. Phone/email links and WeChat ID reveal/copy are implemented; unspecified contact details remain disabled, not invented. The old About URLs permanently redirect to Contact's story section. Maintenance and missing-field notes are in `docs/staff-directory.md`.
 
