@@ -142,5 +142,5 @@ No credentials were fabricated, committed, or printed by the implementation.
 - [x] Inspect and preserve existing DNS state; bind `www` and apex, configure apex 301, and retain the Access allowlist. The zone contained no records before website binding.
 - [x] Deploy the workers.dev production preview with `npm run deploy`; verify home, inventory, five vehicle pages, sitemap, robots, and Access redirect.
 - [x] After custom-domain cutover, verify public pages, media, old URL 301s, and the Access redirect.
-- [ ] Complete one real lead submission end-to-end on the production domain.
+- [x] Submit the production contact form with its real Turnstile challenge, confirm the success message and matching D1 row, then remove the explicitly marked deployment-test lead. Email delivery remains disabled.
 - [ ] Keep the old host read-only for seven days, monitor Worker/Email logs, and retain the rollback version and D1 bookmark.
