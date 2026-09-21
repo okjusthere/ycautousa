@@ -337,14 +337,6 @@ function HomePage() {
             <i />
           </div>
         </div>
-        <div className="hero-ticker">
-          <div className="container">
-            <span>{copy.home.current}</span>
-            <span className="ticker-line" />
-            <span>{copy.home.daily}</span>
-            <span className="ticker-arrow">↘</span>
-          </div>
-        </div>
       </section>
       <section className="section section--featured">
         <div className="container">
@@ -855,14 +847,12 @@ function VehicleDetailPage() {
     useStoreSettings();
   const [similar, setSimilar] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState(0);
   const [formType, setFormType] = useState<
     "availability" | "test_drive" | null
   >(null);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const touchStart = useRef<number | null>(null);
   usePageMeta(
     vehicle
       ? `${vehicle.title} | YC Auto USA`
@@ -878,7 +868,6 @@ function VehicleDetailPage() {
     setNotFound(false);
     setVehicle(null);
     setSimilar([]);
-    setActiveImage(0);
     setFormType(null);
     getVehicle(slug)
       .then((value) => {
@@ -940,10 +929,7 @@ function VehicleDetailPage() {
       </section>
     );
   const images = vehicle.images?.length ? vehicle.images : [];
-  const image = images[activeImage] ?? images[0];
-  const imageSrc = image?.r2Key
-    ? `/media/${image.r2Key}?w=1600&format=webp`
-    : vehicleImage(vehicle);
+  const galleryImages = images.length ? images : [null];
   const sold = vehicle.status === "sold";
   const pending = vehicle.status === "pending";
   const specs = [
@@ -999,63 +985,44 @@ function VehicleDetailPage() {
         </div>
         <div className="container detail-layout">
           <div className="gallery">
-            <div
-              className="gallery-main"
-              onTouchStart={(event) => {
-                touchStart.current = event.touches[0]?.clientX ?? null;
-              }}
-              onTouchEnd={(event) => {
-                const start = touchStart.current;
-                const end = event.changedTouches[0]?.clientX;
-                if (
-                  start !== null &&
-                  end !== undefined &&
-                  Math.abs(end - start) > 45 &&
-                  images.length > 1
-                )
-                  setActiveImage((current) =>
-                    end < start
-                      ? (current + 1) % images.length
-                      : (current - 1 + images.length) % images.length,
-                  );
-                touchStart.current = null;
-              }}
-            >
-              <img
-                src={imageSrc}
-                alt={vehicle.title}
-                decoding="async"
-                width="1600"
-                height="1067"
-              />
-              {(sold || pending) && <StatusPill status={vehicle.status} />}
-              <span className="gallery-counter">
-                {String(activeImage + 1).padStart(2, "0")} /{" "}
-                {String(Math.max(images.length, 1)).padStart(2, "0")}
-              </span>
-            </div>
-            {images.length > 1 && (
-              <div className="gallery-thumbs">
-                {images.map((item, index) => (
-                  <button
-                    key={item.id}
-                    className={index === activeImage ? "active" : ""}
-                    onClick={() => setActiveImage(index)}
-                  >
-                    <img
-                      src={
-                        item.r2Key
-                          ? `/media/${item.r2Key}?w=320&format=webp`
-                          : vehicleImage(vehicle)
-                      }
-                      alt={`${vehicle.title} ${copy.detail.imageView} ${index + 1}`}
-                      width="160"
-                      height="108"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
+            {galleryImages.map((image, index) => (
+              <figure
+                className="gallery-photo"
+                key={image?.id ?? "placeholder"}
+              >
+                <img
+                  src={
+                    image?.r2Key
+                      ? `/media/${image.r2Key}?w=1600&format=webp`
+                      : vehicleImage(vehicle)
+                  }
+                  srcSet={
+                    image?.r2Key
+                      ? [640, 960, 1600]
+                          .map(
+                            (width) =>
+                              `/media/${image.r2Key}?w=${width}&format=webp ${width}w`,
+                          )
+                          .join(", ")
+                      : undefined
+                  }
+                  sizes="(max-width: 820px) calc(100vw - 40px), (max-width: 1440px) 50vw, 680px"
+                  alt={`${vehicle.title} ${copy.detail.imageView} ${index + 1}`}
+                  loading={index === 0 ? "eager" : "lazy"}
+                  fetchPriority={index === 0 ? "high" : "auto"}
+                  decoding="async"
+                  width={image?.width ?? 1600}
+                  height={image?.height ?? 1067}
+                />
+                {index === 0 && (sold || pending) && (
+                  <StatusPill status={vehicle.status} />
+                )}
+                <figcaption className="gallery-counter">
+                  {String(index + 1).padStart(2, "0")} /{" "}
+                  {String(galleryImages.length).padStart(2, "0")}
+                </figcaption>
+              </figure>
+            ))}
           </div>
           <div className="detail-copy">
             <p className="eyebrow">
@@ -1135,10 +1102,6 @@ function VehicleDetailPage() {
                   <strong>{String(value)}</strong>
                 </div>
               ))}
-            </div>
-            <div className="detail-description">
-              <p className="eyebrow">{copy.detail.details}</p>
-              <p>{vehicle.description || copy.detail.detailsFallback}</p>
             </div>
             {vehicle.features.length > 0 && (
               <div className="feature-list">
