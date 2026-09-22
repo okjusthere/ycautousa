@@ -1247,6 +1247,13 @@ select {
   gap: 16px;
   min-width: 0;
 }
+.detail-gallery-more {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
 .gallery-photo {
   position: relative;
   margin: 0;
@@ -3648,8 +3655,13 @@ select {
   .gallery {
     display: contents;
   }
-  .gallery-photo:first-child {
+  .gallery > .gallery-photo:first-child {
     grid-row: 1;
+  }
+  .detail-gallery-more {
+    grid-template-columns: 1fr;
+    gap: 38px;
+    margin-top: 38px;
   }
   .detail-copy {
     grid-row: 2;

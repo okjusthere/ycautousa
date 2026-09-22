@@ -945,6 +945,41 @@ function VehicleDetailPage() {
     ["Exterior", vehicle.exteriorColor],
     ["Interior", vehicle.interiorColor],
   ].filter(([, value]) => value);
+  const galleryPhotos = galleryImages.map((image, index) => (
+    <figure className="gallery-photo" key={image?.id ?? "placeholder"}>
+      <img
+        src={
+          image?.r2Key
+            ? `/media/${image.r2Key}?w=1600&format=webp`
+            : vehicleImage(vehicle)
+        }
+        srcSet={
+          image?.r2Key
+            ? [640, 960, 1600]
+                .map(
+                  (width) =>
+                    `/media/${image.r2Key}?w=${width}&format=webp ${width}w`,
+                )
+                .join(", ")
+            : undefined
+        }
+        sizes="(max-width: 820px) calc(100vw - 40px), (max-width: 1440px) 50vw, 680px"
+        alt={`${vehicle.title} ${copy.detail.imageView} ${index + 1}`}
+        loading={index === 0 ? "eager" : "lazy"}
+        fetchPriority={index === 0 ? "high" : "auto"}
+        decoding="async"
+        width={image?.width ?? 1600}
+        height={image?.height ?? 1067}
+      />
+      {index === 0 && (sold || pending) && (
+        <StatusPill status={vehicle.status} />
+      )}
+      <figcaption className="gallery-counter">
+        {String(index + 1).padStart(2, "0")} /{" "}
+        {String(galleryImages.length).padStart(2, "0")}
+      </figcaption>
+    </figure>
+  ));
   const structured = {
     "@context": "https://schema.org",
     "@type": "Car",
@@ -984,46 +1019,7 @@ function VehicleDetailPage() {
           <span>{vehicle.title}</span>
         </div>
         <div className="container detail-layout">
-          <div className="gallery">
-            {galleryImages.map((image, index) => (
-              <figure
-                className="gallery-photo"
-                key={image?.id ?? "placeholder"}
-              >
-                <img
-                  src={
-                    image?.r2Key
-                      ? `/media/${image.r2Key}?w=1600&format=webp`
-                      : vehicleImage(vehicle)
-                  }
-                  srcSet={
-                    image?.r2Key
-                      ? [640, 960, 1600]
-                          .map(
-                            (width) =>
-                              `/media/${image.r2Key}?w=${width}&format=webp ${width}w`,
-                          )
-                          .join(", ")
-                      : undefined
-                  }
-                  sizes="(max-width: 820px) calc(100vw - 40px), (max-width: 1440px) 50vw, 680px"
-                  alt={`${vehicle.title} ${copy.detail.imageView} ${index + 1}`}
-                  loading={index === 0 ? "eager" : "lazy"}
-                  fetchPriority={index === 0 ? "high" : "auto"}
-                  decoding="async"
-                  width={image?.width ?? 1600}
-                  height={image?.height ?? 1067}
-                />
-                {index === 0 && (sold || pending) && (
-                  <StatusPill status={vehicle.status} />
-                )}
-                <figcaption className="gallery-counter">
-                  {String(index + 1).padStart(2, "0")} /{" "}
-                  {String(galleryImages.length).padStart(2, "0")}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+          <div className="gallery">{galleryPhotos.slice(0, 3)}</div>
           <div className="detail-copy">
             <p className="eyebrow">
               {vehicle.year ?? "—"} /{" "}
@@ -1118,6 +1114,11 @@ function VehicleDetailPage() {
             )}
           </div>
         </div>
+        {galleryPhotos.length > 3 && (
+          <div className="container detail-gallery-more">
+            {galleryPhotos.slice(3)}
+          </div>
+        )}
       </section>
       {similar.length > 0 && (
         <section className="section detail-similar">
