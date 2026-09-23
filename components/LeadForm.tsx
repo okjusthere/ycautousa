@@ -4,18 +4,32 @@ import { mutate } from "../src/api";
 import { Icon } from "./Icon";
 import { useLocale } from "../src/i18n";
 import { useTurnstile } from "./useTurnstile";
+import {
+  CREDIT_SCORE_LABELS,
+  financingSelectionSchema,
+  type FinancingSelection,
+} from "../lib/financing";
+import { financingCopy, financingMoney } from "../src/financing-copy";
 
 export function LeadForm({
   vehicle,
   type = "availability",
   compact = false,
+  financing,
 }: {
   vehicle?: Vehicle | null;
-  type?: "availability" | "test_drive" | "contact" | "trade_sell";
+  type?: "availability" | "test_drive" | "contact" | "trade_sell" | "financing";
   compact?: boolean;
+  financing?: FinancingSelection;
 }) {
-  const { copy, isZh, path } = useLocale();
+  const { copy, isZh, path, locale } = useLocale();
   const isTrade = type === "trade_sell";
+  const isFinancing = type === "financing";
+  const financeCopy = financingCopy[locale];
+  const validFinancing =
+    financingSelectionSchema.safeParse(financing).success &&
+    vehicle?.priceCents != null &&
+    financing!.downPaymentCents <= vehicle.priceCents;
   const [status, setStatus] = useState<
     "idle" | "sending" | "success" | "error"
   >("idle");
@@ -37,6 +51,11 @@ export function LeadForm({
     setError("");
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    if (isFinancing && !validFinancing) {
+      setStatus("error");
+      setError(financeCopy.selectionRequired);
+      return;
+    }
     if (!turnstileToken) {
       setStatus("error");
       setError(copy.lead.verifyError);
@@ -44,6 +63,25 @@ export function LeadForm({
     }
     const phone = String(form.get("phone") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
+    if (isFinancing) {
+      const name = String(form.get("name") ?? "").trim();
+      const emailInput = formElement.elements.namedItem(
+        "email",
+      ) as HTMLInputElement;
+      const financeError =
+        name.length < 2
+          ? financeCopy.nameRequired
+          : !phone && !email
+            ? financeCopy.contactRequired
+            : email && !emailInput.validity.valid
+              ? financeCopy.emailInvalid
+              : "";
+      if (financeError) {
+        setStatus("error");
+        setError(financeError);
+        return;
+      }
+    }
     const wechat = String(form.get("wechat") ?? "").trim();
     const vin = String(form.get("vin") ?? "")
       .replace(/\s/g, "")
@@ -80,6 +118,7 @@ export function LeadForm({
       ...(isTrade
         ? { vin, mileage: Number(mileage), wechat: wechat || null }
         : {}),
+      ...(isFinancing ? { financing } : {}),
       sourceUrl: window.location.href,
       referrer: document.referrer || null,
       utm: Object.fromEntries(
@@ -126,8 +165,20 @@ export function LeadForm({
         <span className="success-mark">
           <Icon name="check" />
         </span>
-        <h3>{isTrade ? copy.lead.tradeReceived : copy.lead.received}</h3>
-        <p>{isTrade ? copy.lead.tradeThanks : copy.lead.thanks}</p>
+        <h3>
+          {isFinancing
+            ? financeCopy.received
+            : isTrade
+              ? copy.lead.tradeReceived
+              : copy.lead.received}
+        </h3>
+        <p>
+          {isFinancing
+            ? financeCopy.thanks
+            : isTrade
+              ? copy.lead.tradeThanks
+              : copy.lead.thanks}
+        </p>
         <button
           className="text-button"
           onClick={() => {
@@ -135,7 +186,11 @@ export function LeadForm({
             setStatus("idle");
           }}
         >
-          {isTrade ? copy.lead.anotherTrade : copy.lead.another}{" "}
+          {isFinancing
+            ? financeCopy.another
+            : isTrade
+              ? copy.lead.anotherTrade
+              : copy.lead.another}{" "}
           <Icon name="arrow" size={16} />
         </button>
       </div>
@@ -162,6 +217,37 @@ export function LeadForm({
             {copy.lead.asking} <strong>{vehicle.title}</strong>
           </span>
         </div>
+      )}
+      {isFinancing && financing && validFinancing && (
+        <dl
+          className="financing-lead-summary"
+          aria-label={financeCopy.selectionSummary}
+        >
+          <div>
+            <dt>{financeCopy.downPayment}</dt>
+            <dd>{financingMoney(financing.downPaymentCents, locale)}</dd>
+          </div>
+          <div>
+            <dt>{financeCopy.loanTerm}</dt>
+            <dd>
+              {financing.termMonths} {financeCopy.months}
+            </dd>
+          </div>
+          <div>
+            <dt>{financeCopy.creditTier}</dt>
+            <dd>
+              {financeCopy.credit[financing.creditTier]} ·{" "}
+              {financing.creditTier === "consultation"
+                ? financeCopy.lowScore
+                : CREDIT_SCORE_LABELS[financing.creditTier]}
+            </dd>
+          </div>
+        </dl>
+      )}
+      {isFinancing && !validFinancing && (
+        <p className="form-error" role="status">
+          {financeCopy.selectionRequired}
+        </p>
       )}
       <div className="form-grid">
         <label>
@@ -198,7 +284,7 @@ export function LeadForm({
             placeholder="you@example.com"
           />
         </label>
-        {!isTrade && (
+        {!isTrade && !isFinancing && (
           <label>
             <span>{copy.lead.preferred}</span>
             <select
@@ -262,6 +348,7 @@ export function LeadForm({
         )}
       </div>
       {isTrade && <p className="form-hint">{copy.lead.contactHint}</p>}
+      {isFinancing && <p className="form-hint">{financeCopy.contactHint}</p>}
       <label>
         <span>{copy.lead.message}</span>
         <textarea
@@ -271,7 +358,11 @@ export function LeadForm({
           rows={compact ? 3 : 4}
           maxLength={3000}
           placeholder={
-            vehicle ? copy.lead.vehicleMessage : copy.lead.helpMessage
+            isFinancing
+              ? financeCopy.messagePlaceholder
+              : vehicle
+                ? copy.lead.vehicleMessage
+                : copy.lead.helpMessage
           }
         />
       </label>
@@ -312,14 +403,19 @@ export function LeadForm({
           {copy.lead.privacyBefore}{" "}
           <a href={path("/privacy")}>{copy.lead.privacy}</a>.
         </p>
-        <button className="button button--red" disabled={status === "sending"}>
+        <button
+          className="button button--red"
+          disabled={status === "sending" || (isFinancing && !validFinancing)}
+        >
           {status === "sending"
             ? copy.lead.sending
-            : type === "test_drive"
-              ? copy.lead.requestDrive
-              : isTrade
-                ? copy.lead.submitTrade
-                : copy.lead.send}{" "}
+            : isFinancing
+              ? financeCopy.submit
+              : type === "test_drive"
+                ? copy.lead.requestDrive
+                : isTrade
+                  ? copy.lead.submitTrade
+                  : copy.lead.send}{" "}
           <Icon name="arrow" size={17} />
         </button>
       </div>

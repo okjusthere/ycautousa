@@ -5,6 +5,7 @@ const placeholder = "/vehicle-placeholder.svg";
 const now = new Date().toISOString();
 
 export const demoSettings: SiteSettings = {
+  financing: null,
   businessName: "Your Choice Auto Group LLC",
   shortName: "YC Auto USA",
   phone: "718-799-0606",

@@ -48,6 +48,9 @@ import {
   vehicleImage,
 } from "../components/VehicleCard";
 import { LeadForm } from "../components/LeadForm";
+import { VehiclePaymentCalculator } from "../components/VehiclePaymentCalculator";
+import { FinancingSettings } from "../components/FinancingSettings";
+import { FinancingSummary } from "../components/FinancingSummary";
 import {
   LeadNotificationPanel,
   notificationLabel,
@@ -1026,12 +1029,25 @@ function VehicleDetailPage() {
               {vehicle.bodyType ?? copy.detail.preownedVehicle}
             </p>
             <h1>{vehicle.title}</h1>
-            <div className="detail-price">
-              <strong>
-                {formatLocalizedPrice(vehicle.priceCents, locale)}
-              </strong>
-              <span>{formatLocalizedMileage(vehicle.mileage, locale)}</span>
-            </div>
+            {!sold && vehicle.priceCents !== null && vehicle.priceCents > 0 ? (
+              <VehiclePaymentCalculator
+                key={vehicle.id}
+                vehicle={vehicle}
+                config={
+                  settingsError || settingsLoading
+                    ? null
+                    : (settings.financing ?? null)
+                }
+                configLoading={settingsLoading}
+              />
+            ) : (
+              <div className="detail-price">
+                <strong>
+                  {formatLocalizedPrice(vehicle.priceCents, locale)}
+                </strong>
+                <span>{formatLocalizedMileage(vehicle.mileage, locale)}</span>
+              </div>
+            )}
             {(sold || pending) && (
               <div className={`detail-status detail-status--${vehicle.status}`}>
                 <span />
@@ -3676,6 +3692,9 @@ function LeadDetail({
         <span>Message</span>
         <p>{lead.message || "No message provided."}</p>
       </div>
+      {lead.details.financing && (
+        <FinancingSummary snapshot={lead.details.financing} />
+      )}
       <LeadNotificationPanel lead={lead} onUpdate={onNotificationUpdate} />
       <Field label="Lead status">
         <select
@@ -3710,6 +3729,9 @@ function LeadDetail({
 
 function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettings>(demoSettings);
+  const [financingDirty, setFinancingDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [notificationRecipient, setNotificationRecipient] = useState<
     string | null
   >(null);
@@ -3733,20 +3755,34 @@ function AdminSettingsPage() {
         setLoading(false);
       });
   }, []);
-  const set = (key: keyof SiteSettings, value: string | null) =>
-    setSettings((old) => ({ ...old, [key]: value }));
+  const set = (
+    key: Exclude<keyof SiteSettings, "financing">,
+    value: string | null,
+  ) => setSettings((old) => ({ ...old, [key]: value }));
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     setMessage("");
     setError("");
     try {
-      const result = await mutate("/api/admin/settings", "PUT", settings);
+      // Saving unrelated business details must not overwrite newer APR settings.
+      const { financing, ...businessSettings } = settings;
+      const result = await mutate("/api/admin/settings", "PUT", {
+        ...businessSettings,
+        ...(financingDirty ? { financing } : {}),
+      });
       setSettings(result.settings ?? settings);
+      setFinancingDirty(false);
       setMessage("Website settings saved.");
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Unable to save settings.",
       );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }
   if (loading) return <Loading label="Loading settings" />;
@@ -3761,8 +3797,12 @@ function AdminSettingsPage() {
             Update public business details without touching code.
           </p>
         </div>
-        <button className="button button--red" form="settings-form">
-          Save changes <Icon name="arrow" size={16} />
+        <button
+          className="button button--red"
+          form="settings-form"
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save changes"} <Icon name="arrow" size={16} />
         </button>
       </div>
       {message && (
@@ -3772,215 +3812,226 @@ function AdminSettingsPage() {
         </div>
       )}
       {error && <ErrorBlock message={error} />}
-      <form id="settings-form" className="editor-form" onSubmit={submit}>
-        <section className="form-section">
-          <div className="form-section-heading">
-            <span>01</span>
-            <div>
-              <h2>Business details</h2>
-              <p>Shown in the header, footer, and contact page.</p>
+      <form id="settings-form" onSubmit={submit} aria-busy={saving}>
+        <fieldset className="editor-form settings-fields" disabled={saving}>
+          <FinancingSettings
+            value={settings.financing ?? null}
+            onChange={(financing) => {
+              setSettings((old) => ({ ...old, financing }));
+              setFinancingDirty(true);
+            }}
+          />
+          <section className="form-section">
+            <div className="form-section-heading">
+              <span>01</span>
+              <div>
+                <h2>Business details</h2>
+                <p>Shown in the header, footer, and contact page.</p>
+              </div>
             </div>
-          </div>
-          <div className="editor-fields">
-            <Field label="Business name" required>
-              <input
-                value={settings.businessName}
-                onChange={(event) => set("businessName", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Short name" required>
-              <input
-                value={settings.shortName}
-                onChange={(event) => set("shortName", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Phone" required>
-              <input
-                value={settings.phone}
-                onChange={(event) => set("phone", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Public email" required>
-              <input
-                type="email"
-                value={settings.email}
-                onChange={(event) => set("email", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Lead notification email" required>
-              <input
-                type="email"
-                value={settings.leadNotificationRecipient}
-                readOnly={!!notificationRecipient}
-                aria-describedby="notification-recipient-help"
-                onChange={(event) =>
-                  set("leadNotificationRecipient", event.target.value)
-                }
-                required
-              />
-              <small id="notification-recipient-help">
-                {notificationRecipient
-                  ? "Verified delivery address. Changing it requires updating the mail service recipient and deployment configuration."
-                  : "Use the verified recipient configured for the mail service."}
-              </small>
-            </Field>
-            <Field label="Address" required>
-              <input
-                value={settings.address}
-                onChange={(event) => set("address", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Business hours">
-              <input
-                value={settings.businessHours}
-                onChange={(event) => set("businessHours", event.target.value)}
-              />
-            </Field>
-            <Field label="Verified WhatsApp number (optional)">
-              <input
-                value={settings.whatsappNumber ?? ""}
-                onChange={(event) =>
-                  set("whatsappNumber", event.target.value || null)
-                }
-                placeholder="Leave blank unless verified"
-              />
-            </Field>
-            <Field label="Logo R2 key (optional)">
-              <input
-                value={settings.logoKey ?? ""}
-                onChange={(event) => set("logoKey", event.target.value || null)}
-                placeholder="branding/logo.svg"
-              />
-            </Field>
-            <Field label="Favicon R2 key (optional)">
-              <input
-                value={settings.faviconKey ?? ""}
-                onChange={(event) =>
-                  set("faviconKey", event.target.value || null)
-                }
-                placeholder="branding/favicon.svg"
-              />
-            </Field>
-          </div>
-        </section>
-        <section className="form-section">
-          <div className="form-section-heading">
-            <span>02</span>
-            <div>
-              <h2>Home & about</h2>
-              <p>Keep these statements factual and concise.</p>
+            <div className="editor-fields">
+              <Field label="Business name" required>
+                <input
+                  value={settings.businessName}
+                  onChange={(event) => set("businessName", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Short name" required>
+                <input
+                  value={settings.shortName}
+                  onChange={(event) => set("shortName", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Phone" required>
+                <input
+                  value={settings.phone}
+                  onChange={(event) => set("phone", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Public email" required>
+                <input
+                  type="email"
+                  value={settings.email}
+                  onChange={(event) => set("email", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Lead notification email" required>
+                <input
+                  type="email"
+                  value={settings.leadNotificationRecipient}
+                  readOnly={!!notificationRecipient}
+                  aria-describedby="notification-recipient-help"
+                  onChange={(event) =>
+                    set("leadNotificationRecipient", event.target.value)
+                  }
+                  required
+                />
+                <small id="notification-recipient-help">
+                  {notificationRecipient
+                    ? "Verified delivery address. Changing it requires updating the mail service recipient and deployment configuration."
+                    : "Use the verified recipient configured for the mail service."}
+                </small>
+              </Field>
+              <Field label="Address" required>
+                <input
+                  value={settings.address}
+                  onChange={(event) => set("address", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Business hours">
+                <input
+                  value={settings.businessHours}
+                  onChange={(event) => set("businessHours", event.target.value)}
+                />
+              </Field>
+              <Field label="Verified WhatsApp number (optional)">
+                <input
+                  value={settings.whatsappNumber ?? ""}
+                  onChange={(event) =>
+                    set("whatsappNumber", event.target.value || null)
+                  }
+                  placeholder="Leave blank unless verified"
+                />
+              </Field>
+              <Field label="Logo R2 key (optional)">
+                <input
+                  value={settings.logoKey ?? ""}
+                  onChange={(event) =>
+                    set("logoKey", event.target.value || null)
+                  }
+                  placeholder="branding/logo.svg"
+                />
+              </Field>
+              <Field label="Favicon R2 key (optional)">
+                <input
+                  value={settings.faviconKey ?? ""}
+                  onChange={(event) =>
+                    set("faviconKey", event.target.value || null)
+                  }
+                  placeholder="branding/favicon.svg"
+                />
+              </Field>
             </div>
-          </div>
-          <div className="editor-fields">
-            <Field label="Hero title" required>
-              <input
-                value={settings.heroTitle}
-                onChange={(event) => set("heroTitle", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Hero subtitle" required>
-              <input
-                value={settings.heroSubtitle}
-                onChange={(event) => set("heroSubtitle", event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Hero title — Chinese">
-              <input
-                value={settings.heroTitleZh ?? ""}
-                onChange={(event) =>
-                  set("heroTitleZh", event.target.value || null)
-                }
-                placeholder="找到你的下一辆车"
-              />
-            </Field>
-            <Field label="Hero subtitle — Chinese">
-              <input
-                value={settings.heroSubtitleZh ?? ""}
-                onChange={(event) =>
-                  set("heroSubtitleZh", event.target.value || null)
-                }
-              />
-            </Field>
-          </div>
-          <Field label="About text">
-            <textarea
-              rows={5}
-              value={settings.aboutText}
-              onChange={(event) => set("aboutText", event.target.value)}
-            />
-          </Field>
-          <Field label="About text — Chinese">
-            <textarea
-              rows={5}
-              value={settings.aboutTextZh ?? ""}
-              onChange={(event) =>
-                set("aboutTextZh", event.target.value || null)
-              }
-            />
-          </Field>
-          <Field label="Why choose YC Auto">
-            <textarea
-              rows={4}
-              value={settings.whyChooseText}
-              onChange={(event) => set("whyChooseText", event.target.value)}
-            />
-          </Field>
-          <Field label="Why choose YC Auto — Chinese">
-            <textarea
-              rows={4}
-              value={settings.whyChooseTextZh ?? ""}
-              onChange={(event) =>
-                set("whyChooseTextZh", event.target.value || null)
-              }
-            />
-          </Field>
-        </section>
-        <section className="form-section">
-          <div className="form-section-heading">
-            <span>03</span>
-            <div>
-              <h2>Search appearance</h2>
-              <p>Used as the default title and summary in search results.</p>
+          </section>
+          <section className="form-section">
+            <div className="form-section-heading">
+              <span>02</span>
+              <div>
+                <h2>Home & about</h2>
+                <p>Keep these statements factual and concise.</p>
+              </div>
             </div>
-          </div>
-          <Field label="SEO title">
-            <input
-              value={settings.seoTitle}
-              onChange={(event) => set("seoTitle", event.target.value)}
-            />
-          </Field>
-          <Field label="SEO description">
-            <textarea
-              rows={3}
-              value={settings.seoDescription}
-              onChange={(event) => set("seoDescription", event.target.value)}
-            />
-          </Field>
-          <Field label="SEO title — Chinese">
-            <input
-              value={settings.seoTitleZh ?? ""}
-              onChange={(event) =>
-                set("seoTitleZh", event.target.value || null)
-              }
-            />
-          </Field>
-          <Field label="SEO description — Chinese">
-            <textarea
-              rows={3}
-              value={settings.seoDescriptionZh ?? ""}
-              onChange={(event) =>
-                set("seoDescriptionZh", event.target.value || null)
-              }
-            />
-          </Field>
-        </section>
+            <div className="editor-fields">
+              <Field label="Hero title" required>
+                <input
+                  value={settings.heroTitle}
+                  onChange={(event) => set("heroTitle", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Hero subtitle" required>
+                <input
+                  value={settings.heroSubtitle}
+                  onChange={(event) => set("heroSubtitle", event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Hero title — Chinese">
+                <input
+                  value={settings.heroTitleZh ?? ""}
+                  onChange={(event) =>
+                    set("heroTitleZh", event.target.value || null)
+                  }
+                  placeholder="找到你的下一辆车"
+                />
+              </Field>
+              <Field label="Hero subtitle — Chinese">
+                <input
+                  value={settings.heroSubtitleZh ?? ""}
+                  onChange={(event) =>
+                    set("heroSubtitleZh", event.target.value || null)
+                  }
+                />
+              </Field>
+            </div>
+            <Field label="About text">
+              <textarea
+                rows={5}
+                value={settings.aboutText}
+                onChange={(event) => set("aboutText", event.target.value)}
+              />
+            </Field>
+            <Field label="About text — Chinese">
+              <textarea
+                rows={5}
+                value={settings.aboutTextZh ?? ""}
+                onChange={(event) =>
+                  set("aboutTextZh", event.target.value || null)
+                }
+              />
+            </Field>
+            <Field label="Why choose YC Auto">
+              <textarea
+                rows={4}
+                value={settings.whyChooseText}
+                onChange={(event) => set("whyChooseText", event.target.value)}
+              />
+            </Field>
+            <Field label="Why choose YC Auto — Chinese">
+              <textarea
+                rows={4}
+                value={settings.whyChooseTextZh ?? ""}
+                onChange={(event) =>
+                  set("whyChooseTextZh", event.target.value || null)
+                }
+              />
+            </Field>
+          </section>
+          <section className="form-section">
+            <div className="form-section-heading">
+              <span>03</span>
+              <div>
+                <h2>Search appearance</h2>
+                <p>Used as the default title and summary in search results.</p>
+              </div>
+            </div>
+            <Field label="SEO title">
+              <input
+                value={settings.seoTitle}
+                onChange={(event) => set("seoTitle", event.target.value)}
+              />
+            </Field>
+            <Field label="SEO description">
+              <textarea
+                rows={3}
+                value={settings.seoDescription}
+                onChange={(event) => set("seoDescription", event.target.value)}
+              />
+            </Field>
+            <Field label="SEO title — Chinese">
+              <input
+                value={settings.seoTitleZh ?? ""}
+                onChange={(event) =>
+                  set("seoTitleZh", event.target.value || null)
+                }
+              />
+            </Field>
+            <Field label="SEO description — Chinese">
+              <textarea
+                rows={3}
+                value={settings.seoDescriptionZh ?? ""}
+                onChange={(event) =>
+                  set("seoDescriptionZh", event.target.value || null)
+                }
+              />
+            </Field>
+          </section>
+        </fieldset>
       </form>
     </div>
   );

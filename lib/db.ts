@@ -12,7 +12,13 @@ import type {
   InventoryFacets,
 } from "./types";
 import { nowIso, uid } from "./utils";
-import { notificationColumns, readNotification } from "./lead-delivery";
+import {
+  atomicBatch,
+  notificationColumns,
+  readNotification,
+} from "./lead-delivery";
+import { financingSnapshotSchema, parseFinancingConfig } from "./financing";
+import type { SettingsInput } from "./validation";
 
 export type D1Result<T = unknown> = {
   results: T[];
@@ -123,7 +129,9 @@ export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
     const parsed = JSON.parse(String(row.details_json ?? "{}"));
     if (parsed && typeof parsed === "object") {
       const candidate = parsed as Record<string, unknown>;
+      const financing = financingSnapshotSchema.safeParse(candidate.financing);
       details = {
+        ...(financing.success ? { financing: financing.data } : {}),
         ...(typeof candidate.vin === "string" ? { vin: candidate.vin } : {}),
         ...(typeof candidate.mileage === "number"
           ? { mileage: candidate.mileage }
@@ -163,6 +171,7 @@ export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
 
 export function rowToSettings(row: Record<string, unknown>): SiteSettings {
   return {
+    financing: parseFinancingConfig(row.financing_config_json),
     businessName: String(row.business_name ?? ""),
     shortName: String(row.short_name ?? ""),
     phone: String(row.phone ?? ""),
@@ -897,39 +906,71 @@ export async function trackEvent(
 
 export async function updateSettings(
   db: D1Like,
-  settings: SiteSettings,
+  settings: SettingsInput,
+  adminEmail: string,
 ): Promise<void> {
-  await db
-    .prepare(
-      "UPDATE site_settings SET business_name=?,short_name=?,phone=?,sms_number=?,email=?,address=?,business_hours=?,hero_title=?,hero_subtitle=?,hero_title_zh=?,hero_subtitle_zh=?,about_text=?,about_text_zh=?,why_choose_text=?,why_choose_text_zh=?,lead_notification_recipient=?,seo_title=?,seo_description=?,seo_title_zh=?,seo_description_zh=?,whatsapp_number=?,logo_key=?,favicon_key=?,updated_at=? WHERE id=1",
-    )
-    .bind(
-      settings.businessName,
-      settings.shortName,
-      settings.phone,
-      settings.smsNumber,
-      settings.email,
-      settings.address,
-      settings.businessHours,
-      settings.heroTitle,
-      settings.heroSubtitle,
-      settings.heroTitleZh,
-      settings.heroSubtitleZh,
-      settings.aboutText,
-      settings.aboutTextZh,
-      settings.whyChooseText,
-      settings.whyChooseTextZh,
-      settings.leadNotificationRecipient,
-      settings.seoTitle,
-      settings.seoDescription,
-      settings.seoTitleZh,
-      settings.seoDescriptionZh,
-      settings.whatsappNumber,
-      settings.logoKey,
-      settings.faviconKey,
-      nowIso(),
-    )
-    .run();
+  const includesFinancing = settings.financing !== undefined;
+  const financingJson = JSON.stringify(settings.financing ?? null);
+  const at = nowIso();
+  // Read the previous configuration inside the transaction so the audit entry
+  // always describes the value this save actually replaced.
+  await atomicBatch(db, [
+    db
+      .prepare(
+        `INSERT INTO audit_logs
+        (id,admin_email,action,entity_type,entity_id,details_json,created_at)
+       SELECT ?,?,'settings_updated','settings','1',
+         CASE WHEN ? THEN json_object('financing', json_object(
+           'before', json(CASE WHEN json_valid(financing_config_json)
+             THEN financing_config_json ELSE 'null' END),
+           'after', json(?))) ELSE '{}' END,?
+       FROM site_settings WHERE id=1`,
+      )
+      .bind(
+        uid("audit"),
+        adminEmail,
+        includesFinancing ? 1 : 0,
+        financingJson,
+        at,
+      ),
+    db
+      .prepare(
+        `UPDATE site_settings SET
+       business_name=?,short_name=?,phone=?,sms_number=?,email=?,address=?,business_hours=?,
+       hero_title=?,hero_subtitle=?,hero_title_zh=?,hero_subtitle_zh=?,about_text=?,about_text_zh=?,
+       why_choose_text=?,why_choose_text_zh=?,lead_notification_recipient=?,seo_title=?,seo_description=?,
+       seo_title_zh=?,seo_description_zh=?,whatsapp_number=?,logo_key=?,favicon_key=?,
+       financing_config_json=CASE WHEN ? THEN ? ELSE financing_config_json END,updated_at=? WHERE id=1`,
+      )
+      .bind(
+        settings.businessName,
+        settings.shortName,
+        settings.phone,
+        settings.smsNumber,
+        settings.email,
+        settings.address,
+        settings.businessHours,
+        settings.heroTitle,
+        settings.heroSubtitle,
+        settings.heroTitleZh ?? null,
+        settings.heroSubtitleZh ?? null,
+        settings.aboutText,
+        settings.aboutTextZh ?? null,
+        settings.whyChooseText,
+        settings.whyChooseTextZh ?? null,
+        settings.leadNotificationRecipient,
+        settings.seoTitle,
+        settings.seoDescription,
+        settings.seoTitleZh ?? null,
+        settings.seoDescriptionZh ?? null,
+        settings.whatsappNumber ?? null,
+        settings.logoKey ?? null,
+        settings.faviconKey ?? null,
+        includesFinancing ? 1 : 0,
+        settings.financing == null ? null : financingJson,
+        at,
+      ),
+  ]);
 }
 
 export async function listSitemapVehicles(

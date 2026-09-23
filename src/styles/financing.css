@@ -1,0 +1,505 @@
+.payment-calculator {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.payment-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--line);
+}
+
+.payment-tabs button {
+  min-height: 52px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  padding: 14px 20px;
+  color: #656963;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.payment-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--red);
+  color: var(--ink);
+  background: var(--bone);
+}
+
+.payment-vehicle-price {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px 16px;
+  padding: 23px 24px 20px;
+}
+
+.payment-vehicle-price > div > span,
+.payment-result-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #656963;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.payment-vehicle-price strong {
+  display: block;
+  font-family: "Space Grotesk Variable", sans-serif;
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-mileage {
+  padding-bottom: 4px;
+  color: #656963;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.payment-fees {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #656963;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.payment-panel {
+  border-top: 1px solid var(--line);
+  padding: 22px 24px 24px;
+}
+
+.payment-panel[hidden] {
+  display: none;
+}
+
+.payment-down-payment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 42%);
+  align-items: center;
+  gap: 9px 14px;
+}
+
+.payment-down-payment > label,
+.payment-options legend {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.payment-amount-input,
+.financing-rate-input {
+  position: relative;
+}
+
+.payment-amount-input > span {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  color: #656963;
+  transform: translateY(-50%);
+}
+
+.payment-amount-input input {
+  padding-left: 29px;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-amount-input input[aria-invalid="true"],
+.financing-rate-input input[aria-invalid="true"] {
+  border-color: var(--red-dark);
+}
+
+.payment-slider {
+  grid-column: 1 / -1;
+  min-height: 32px;
+  margin: 3px 0 -5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  accent-color: var(--red-dark);
+  cursor: pointer;
+}
+
+.payment-range-labels {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  color: #656963;
+  font-size: 11px;
+}
+
+.payment-help,
+.financing-settings-help {
+  margin: 0;
+  color: #656963;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.settings-fields {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.payment-down-payment > p {
+  grid-column: 1 / -1;
+}
+
+.payment-error {
+  margin: 0;
+  color: var(--red-dark);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.payment-options {
+  min-inline-size: 0;
+  margin: 23px 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.payment-options legend {
+  margin-bottom: 11px;
+  padding: 0;
+}
+
+.payment-options .payment-help {
+  margin: -3px 0 12px;
+}
+
+.payment-term-options,
+.payment-credit-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.payment-option {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.payment-option > input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.payment-option > span {
+  display: flex;
+  min-height: 51px;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 9px 5px;
+  font-size: 10px;
+  text-align: center;
+}
+
+.payment-option strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.payment-option small {
+  color: #656963;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.payment-option input:checked + span {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.payment-option input:checked + span small {
+  color: #eee9df;
+}
+
+.payment-option input:focus-visible + span {
+  outline: 3px solid var(--amber);
+  outline-offset: 3px;
+}
+
+.payment-option:hover > span {
+  border-color: var(--ink);
+}
+
+.payment-result {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.payment-result > p:last-child {
+  margin-bottom: 0;
+}
+
+.payment-result > strong + p {
+  margin: 8px 0 0;
+  color: #656963;
+}
+
+.payment-monthly {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 0 0 8px;
+}
+
+.payment-monthly strong {
+  font-family: "Space Grotesk Variable", sans-serif;
+  font-size: clamp(32px, 3.5vw, 46px);
+  font-weight: 650;
+  letter-spacing: -0.055em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-monthly > span {
+  color: #656963;
+  font-size: 12px;
+}
+
+.payment-rate {
+  margin: 0 0 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.payment-rate > span {
+  margin-inline: 6px;
+  color: #656963;
+}
+
+.payment-estimate-note {
+  margin: 8px 0 0;
+  color: #656963;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.payment-details {
+  margin-top: 17px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.payment-details summary {
+  min-height: 44px;
+  padding: 14px 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.payment-details dl,
+.financing-lead-summary,
+.financing-snapshot dl {
+  margin: 0 0 17px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.payment-details dl > div,
+.financing-lead-summary > div,
+.financing-snapshot dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 5px;
+}
+
+.payment-details dt,
+.financing-lead-summary dt,
+.financing-snapshot dt {
+  color: #656963;
+}
+
+.payment-details dd,
+.financing-lead-summary dd,
+.financing-snapshot dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-inquiry-button {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.payment-inquiry {
+  margin-top: 23px;
+  border-top: 1px solid var(--line);
+  padding-top: 23px;
+}
+
+.payment-inquiry h3 {
+  margin: 0 0 8px;
+  font-size: 23px;
+}
+
+.payment-inquiry > .payment-help {
+  margin-bottom: 20px;
+}
+
+.payment-inquiry .form-context {
+  align-items: flex-start;
+}
+
+.payment-inquiry .form-context svg {
+  flex-shrink: 0;
+}
+
+.payment-inquiry .form-submit-row {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.payment-inquiry .form-privacy {
+  max-width: none;
+}
+
+.payment-inquiry .turnstile-widget {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.financing-lead-summary {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+
+.financing-settings-help {
+  max-width: 760px;
+  margin: 0 0 18px;
+}
+
+.financing-illustrative {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.financing-illustrative input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.financing-rate-tier {
+  min-inline-size: 0;
+  margin: 23px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 17px 0 0;
+}
+
+.financing-rate-tier legend {
+  padding-right: 12px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.financing-rate-tier legend > span {
+  margin-left: 6px;
+  color: #656963;
+  font-weight: 400;
+}
+
+.financing-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.financing-rate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.financing-rate-input > span {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  color: #656963;
+  transform: translateY(-50%);
+}
+
+.financing-rate-input input {
+  padding-right: 32px;
+}
+
+.financing-snapshot > p {
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+@media (max-width: 640px) {
+  .payment-vehicle-price,
+  .payment-panel {
+    padding-inline: 18px;
+  }
+
+  .payment-credit-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payment-option > span {
+    min-height: 54px;
+  }
+
+  .financing-rate-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 380px) {
+  .payment-vehicle-price {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .payment-mileage {
+    padding: 0;
+  }
+
+  .payment-vehicle-price strong {
+    font-size: 32px;
+  }
+}

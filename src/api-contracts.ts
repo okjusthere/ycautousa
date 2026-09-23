@@ -1,4 +1,8 @@
 import { isRecord } from "./http";
+import {
+  financingConfigSchema,
+  financingSnapshotSchema,
+} from "../lib/financing";
 
 const strings = (value: Record<string, unknown>, keys: string[]) =>
   keys.every((key) => typeof value[key] === "string");
@@ -12,6 +16,8 @@ const integer = (value: unknown, min = 0) =>
 export function validSettings(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value.financing == null ||
+      financingConfigSchema.safeParse(value.financing).success) &&
     strings(value, [
       "businessName",
       "shortName",
@@ -141,6 +147,8 @@ export function validLead(value: unknown): boolean {
     ]) &&
     (value.notification == null || validNotification(value.notification)) &&
     isRecord(value.details) &&
+    (value.details.financing === undefined ||
+      financingSnapshotSchema.safeParse(value.details.financing).success) &&
     (value.details.vin === undefined ||
       typeof value.details.vin === "string") &&
     (value.details.wechat === undefined ||

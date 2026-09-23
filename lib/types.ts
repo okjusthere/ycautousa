@@ -1,3 +1,5 @@
+import type { FinancingConfig, FinancingSnapshot } from "./financing";
+
 export const VEHICLE_STATUSES = [
   "available",
   "pending",
@@ -86,6 +88,7 @@ export type Lead = {
     vin?: string;
     mileage?: number;
     wechat?: string;
+    financing?: FinancingSnapshot;
   };
   status: LeadStatus;
   sourceUrl: string | null;
@@ -102,6 +105,7 @@ export type Lead = {
 };
 
 export type SiteSettings = {
+  financing: FinancingConfig | null;
   businessName: string;
   shortName: string;
   phone: string;

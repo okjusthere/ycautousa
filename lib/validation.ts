@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LEAD_STATUSES, VEHICLE_STATUSES } from "./types";
+import { financingConfigSchema, financingSelectionSchema } from "./financing";
 
 export const vinSchema = z
   .string()
@@ -54,8 +55,15 @@ export const leadInputSchema = z
   .object({
     vehicleId: z.string().trim().max(80).nullable().optional(),
     leadType: z
-      .enum(["availability", "test_drive", "contact", "trade_sell"])
+      .enum([
+        "availability",
+        "test_drive",
+        "contact",
+        "trade_sell",
+        "financing",
+      ])
       .default("contact"),
+    financing: financingSelectionSchema.optional(),
     name: z.string().trim().min(2).max(100),
     phone: z.string().trim().max(40).nullable().optional(),
     email: z.string().trim().email().max(254).nullable().optional(),
@@ -77,6 +85,26 @@ export const leadInputSchema = z
     honeypot: z.string().max(200).optional().default(""),
   })
   .superRefine((value, context) => {
+    if (value.leadType === "financing") {
+      if (!value.vehicleId)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A vehicle is required for a financing inquiry",
+          path: ["vehicleId"],
+        });
+      if (!value.financing)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Financing selections are required",
+          path: ["financing"],
+        });
+    } else if (value.financing !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Financing selections require a financing inquiry",
+        path: ["financing"],
+      });
+    }
     const contactProvided =
       value.leadType === "trade_sell"
         ? Boolean(value.phone || value.email || value.wechat)
@@ -110,6 +138,8 @@ export const leadUpdateSchema = z.object({
 });
 
 export const settingsSchema = z.object({
+  // Omission is a legacy client, while null explicitly disables estimates.
+  financing: financingConfigSchema.nullable().optional(),
   businessName: z.string().trim().min(1).max(160),
   shortName: z.string().trim().min(1).max(80),
   phone: z.string().trim().min(3).max(40),
@@ -134,6 +164,8 @@ export const settingsSchema = z.object({
   logoKey: z.string().trim().max(300).nullable().optional(),
   faviconKey: z.string().trim().max(300).nullable().optional(),
 });
+
+export type SettingsInput = z.infer<typeof settingsSchema>;
 
 export const imageMetaSchema = z.object({
   filename: z.string().trim().min(1).max(255),

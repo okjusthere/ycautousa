@@ -63,6 +63,7 @@ import { queueManualRetry, scheduleNotification } from "./notifications";
 import { MediaUploadError, serveMedia, uploadVehicleImage } from "./media";
 import { verifyTurnstile } from "./turnstile";
 import { assertVehicleTransition } from "../lib/status";
+import { estimateFinancing, type FinancingSnapshot } from "../lib/financing";
 
 type RequestOptions = {
   fetchImpl?: typeof fetch;
@@ -360,6 +361,35 @@ async function submitLead(
     if (!vehicle || vehicle.status === "sold")
       return errorResponse("That vehicle is no longer available.", 409);
   }
+  let financing: FinancingSnapshot | undefined;
+  if (parsed.data.leadType === "financing") {
+    const selection = parsed.data.financing;
+    if (
+      !vehicle ||
+      vehicle.priceCents === null ||
+      vehicle.priceCents <= 0 ||
+      !Number.isSafeInteger(vehicle.priceCents) ||
+      vehicle.priceCents > 100_000_000 ||
+      !selection
+    )
+      return errorResponse(
+        "A priced vehicle is required for a financing inquiry.",
+        400,
+      );
+    if (selection.downPaymentCents > vehicle.priceCents)
+      return errorResponse(
+        "Down payment must not exceed the current vehicle price.",
+        400,
+      );
+    const settings = await getSettings(env.DB);
+    financing = {
+      version: 1,
+      ...selection,
+      priceCents: vehicle.priceCents,
+      ...estimateFinancing(vehicle.priceCents, selection, settings.financing),
+      calculatedAt: nowIso(),
+    };
+  }
   const saved = await saveLeadAndNotification(
     env.DB,
     {
@@ -384,7 +414,9 @@ async function submitLead(
               mileage: parsed.data.mileage ?? undefined,
               wechat: parsed.data.wechat ?? undefined,
             }
-          : {},
+          : financing
+            ? { financing }
+            : {},
       sourceUrl: parsed.data.sourceUrl ?? request.url,
       referrer: parsed.data.referrer ?? request.headers.get("Referer"),
       utm: parsed.data.utm,
@@ -786,8 +818,7 @@ async function adminApi(
         "Notification email must match the verified recipient configured for this deployment.",
         400,
       );
-    await updateSettings(env.DB, parsed.data as SiteSettings);
-    await addAudit(env.DB, email, "settings_updated", "settings", "1");
+    await updateSettings(env.DB, parsed.data, email);
     return json({ ok: true, settings: await getSettings(env.DB) });
   }
   if (path === "/api/admin/audit" && request.method === "GET")
