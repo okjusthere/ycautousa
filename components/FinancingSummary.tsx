@@ -53,15 +53,7 @@ export function FinancingSummary({
               <dd>
                 {snapshot.monthlyPaymentCents === null
                   ? "—"
-                  : financingMoney(snapshot.monthlyPaymentCents)}
-              </dd>
-            </div>
-            <div>
-              <dt>Total interest</dt>
-              <dd>
-                {snapshot.totalInterestCents === null
-                  ? "—"
-                  : financingMoney(snapshot.totalInterestCents)}
+                  : financingMoney(snapshot.monthlyPaymentCents, "en", true)}
               </dd>
             </div>
           </>

@@ -59,7 +59,7 @@ export function VehiclePaymentCalculator({
     downCents === priceCents
       ? sliderSteps
       : Math.min(sliderSteps, Math.round((downCents ?? 0) / 25_000));
-  const money = (cents: number, decimals = true) =>
+  const money = (cents: number, decimals = false) =>
     financingMoney(cents, locale, decimals);
 
   function navigateTabs(event: KeyboardEvent<HTMLButtonElement>) {
@@ -233,7 +233,7 @@ export function VehiclePaymentCalculator({
               </span>
               <p className="payment-monthly">
                 <strong data-testid="financing-monthly-payment">
-                  {money(estimate.monthlyPaymentCents!)}
+                  {money(estimate.monthlyPaymentCents!, true)}
                 </strong>
                 <span>{copy.perMonth}</span>
               </p>
@@ -280,10 +280,6 @@ export function VehiclePaymentCalculator({
                 <dd>
                   {termMonths} {copy.months}
                 </dd>
-              </div>
-              <div>
-                <dt>{copy.totalInterest}</dt>
-                <dd>{money(estimate.totalInterestCents!)}</dd>
               </div>
             </dl>
           </details>

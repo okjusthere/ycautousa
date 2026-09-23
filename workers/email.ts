@@ -11,10 +11,12 @@ const leadTypeLabels: Record<string, string> = {
   financing: "Financing inquiry",
 };
 
-const money = (cents: number) =>
+const money = (cents: number, decimals = false) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: decimals ? 2 : 0,
+    maximumFractionDigits: decimals ? 2 : 0,
   }).format(cents / 100);
 
 function financingDetails(lead: Lead): Array<[string, string]> {
@@ -34,13 +36,11 @@ function financingDetails(lead: Lead): Array<[string, string]> {
   if (
     snapshot.status === "estimated" &&
     snapshot.aprPercent !== null &&
-    snapshot.monthlyPaymentCents !== null &&
-    snapshot.totalInterestCents !== null
+    snapshot.monthlyPaymentCents !== null
   ) {
     rows.push(
       ["APR", `${snapshot.aprPercent}%`],
-      ["Estimated monthly payment", money(snapshot.monthlyPaymentCents)],
-      ["Estimated total interest", money(snapshot.totalInterestCents)],
+      ["Estimated monthly payment", money(snapshot.monthlyPaymentCents, true)],
     );
   } else {
     rows.push([

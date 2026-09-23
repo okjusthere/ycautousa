@@ -106,11 +106,13 @@ test.describe("vehicle financing calculator", () => {
     ).toHaveText("$364.33");
     await expect(calculator).toContainText("Uses preset illustrative rates");
     await calculator.getByText("Calculation details", { exact: true }).click();
-    await expect(calculator.locator(".payment-details")).toContainText(
-      "$21,990.00",
-    );
-    await expect(calculator.locator(".payment-details")).toContainText(
-      "$4,242.05",
+    await expect(
+      calculator
+        .locator(".payment-details")
+        .getByText("$21,990", { exact: true }),
+    ).toBeVisible();
+    await expect(calculator.locator(".payment-details")).not.toContainText(
+      /Estimated total interest|预估总利息/,
     );
     await calculator
       .getByRole("slider", { name: "Down payment slider" })
@@ -121,9 +123,11 @@ test.describe("vehicle financing calculator", () => {
     const payment = await calculator
       .getByTestId("financing-monthly-payment")
       .textContent();
-    await expect(calculator.locator(".payment-details")).toContainText(
-      "$20,989.75",
-    );
+    await expect(
+      calculator
+        .locator(".payment-details")
+        .getByText("$20,990", { exact: true }),
+    ).toBeVisible();
 
     const cash = calculator.getByRole("tab", { name: "Cash", exact: true });
     await cash.click();

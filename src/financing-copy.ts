@@ -42,7 +42,6 @@ export const financingCopy = {
       "Uses preset illustrative rates. This estimate is not a loan offer.",
     details: "Calculation details",
     principal: "Amount financed",
-    totalInterest: "Estimated total interest",
     inquiry: "Ask about financing",
     inquiryTitle: "Talk with our team",
     inquiryHelp:
@@ -98,7 +97,6 @@ export const financingCopy = {
     illustrativeNotice: "使用预设估算利率，此估算并非贷款报价。",
     details: "计算明细",
     principal: "贷款本金",
-    totalInterest: "预估总利息",
     inquiry: "咨询贷款方案",
     inquiryTitle: "联系团队",
     inquiryHelp: "您选择的贷款信息将随留言发送，提交此表格不会发起信用申请。",
@@ -119,12 +117,12 @@ export const financingCopy = {
 export function financingMoney(
   cents: number,
   locale: Locale = "en",
-  decimals = true,
+  decimals = false,
 ) {
   return new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: decimals ? 2 : 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: decimals ? 2 : 0,
   }).format(cents / 100);
 }
