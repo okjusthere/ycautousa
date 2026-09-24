@@ -11,3 +11,12 @@
 - Secrets belong in Wrangler/Cloudflare configuration, never in source, migration output, or logs.
 
 Before production, verify the Access policy is not Everyone, replace all local variables and Access placeholders, set a random IP hash salt, configure a real Turnstile widget/secret, and review `npm audit` output.
+
+## Private pre-approval requests
+
+- Identity, SSN, address, residence duration and contact details are stored only in `preapproval_applications` as AES-256-GCM ciphertext. A random 96-bit nonce is generated for each application; authenticated additional data binds it to the server-generated lead ID.
+- `PREAPPROVAL_KEYS` is a Worker secret containing a versioned 256-bit master keyring. HKDF derives separate encryption and HMAC keys. Neither keys nor application plaintext may appear in source, logs, audit details, ordinary lead columns, email, analytics, URLs, or browser persistent storage.
+- Public submission requires validated fields, explicit collection consent, server-verified Turnstile, and the existing request limits. The lead receipt, ciphertext and notification job are one atomic database operation; missing keys fail closed before any write. A keyed fingerprint supports retry deduplication without an offline SSN-guessing oracle.
+- Private reads use same-origin POST under Cloudflare Access and the administrator allowlist. A fixed-purpose audit entry must be saved before decryption. Responses use `Cache-Control: no-store`. Lists and dashboards never fetch private payloads.
+- The admin UI requests private data only after an explicit action, masks SSN by default, and clears the displayed payload after 60 seconds, on blur/tab hiding, or on unmount. An aborted or stale response cannot reopen the private view. Browser memory clearing is best-effort; authorized users can still inspect a response they have permission to retrieve.
+- Confirmed deletion atomically removes the active ciphertext, marks the receipt deleted, and records the administrator. It does not instantly erase historical backups or remove the keyed retry digest. See [pre-approval operations](PREAPPROVAL.md).

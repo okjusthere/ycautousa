@@ -1,4 +1,5 @@
 import type { FinancingConfig, FinancingSnapshot } from "./financing";
+import type { PreapprovalMetadata } from "./preapproval";
 
 export const VEHICLE_STATUSES = [
   "available",
@@ -89,6 +90,7 @@ export type Lead = {
     mileage?: number;
     wechat?: string;
     financing?: FinancingSnapshot;
+    preapproval?: PreapprovalMetadata;
   };
   status: LeadStatus;
   sourceUrl: string | null;

@@ -37,9 +37,17 @@ export async function saveLeadAndNotification(
   db: D1Like,
   lead: NewLead,
   submission: { key: string | null; hash: string; recipient: string },
+  secureApplication?: { encrypt: (leadId: string) => Promise<string> },
 ): Promise<{ id: string; created: boolean; hash: string }> {
+  if ((lead.leadType === "preapproval") !== Boolean(secureApplication))
+    throw new Error("Pre-approval storage requires an encrypted application");
   const id = uid("lead");
   const at = nowIso();
+  // Encrypt before any database write. The callback binds the envelope to this
+  // server-generated lead ID without exposing plaintext to persistence helpers.
+  const ciphertext = secureApplication
+    ? await secureApplication.encrypt(id)
+    : null;
   await atomicBatch(db, [
     db
       .prepare(
@@ -69,6 +77,16 @@ export async function saveLeadAndNotification(
         submission.key,
         submission.hash,
       ),
+    ...(ciphertext === null
+      ? []
+      : [
+          db
+            .prepare(
+              `INSERT INTO preapproval_applications (lead_id,ciphertext,created_at)
+             SELECT id,?,? FROM leads WHERE id=?`,
+            )
+            .bind(ciphertext, at, id),
+        ]),
     db
       .prepare(
         `INSERT INTO lead_email_jobs (lead_id,recipient,status,next_attempt_at,created_at,updated_at)

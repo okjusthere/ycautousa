@@ -9,6 +9,7 @@ const leadTypeLabels: Record<string, string> = {
   contact: "General inquiry",
   trade_sell: "Trade/Sell request",
   financing: "Financing inquiry",
+  preapproval: "Pre-approval request",
 };
 
 const money = (cents: number, decimals = false) =>
@@ -81,27 +82,38 @@ export async function sendLeadNotification(
     ? `${lead.vehicle.title} (${lead.vehicle.slug})`
     : "General contact";
   const title =
-    lead.leadType === "trade_sell"
-      ? "New Trade/Sell request"
-      : lead.leadType === "financing"
-        ? "New financing inquiry"
-        : "New YC Auto lead";
-  const rows: Array<[string, string]> = [
-    ["Type", leadTypeLabels[lead.leadType] ?? lead.leadType],
-    ["Vehicle", vehicleLine],
-    ["Name", lead.name],
-    ["Phone", lead.phone ?? "—"],
-    ["Email", lead.email ?? "—"],
-    ["Preferred contact", lead.preferredContact ?? "—"],
-    ["Message", lead.message ?? "—"],
-  ];
+    lead.leadType === "preapproval"
+      ? "New pre-approval request"
+      : lead.leadType === "trade_sell"
+        ? "New Trade/Sell request"
+        : lead.leadType === "financing"
+          ? "New financing inquiry"
+          : "New YC Auto lead";
+  // Application notifications contain only a receipt and protected admin link.
+  // Do not add customer identity, financial selections, or free text to this branch.
+  const rows: Array<[string, string]> =
+    lead.leadType === "preapproval"
+      ? [
+          ["Vehicle", vehicleLine],
+          ["Received", lead.details.preapproval?.submittedAt ?? lead.createdAt],
+        ]
+      : [
+          ["Type", leadTypeLabels[lead.leadType] ?? lead.leadType],
+          ["Vehicle", vehicleLine],
+          ["Name", lead.name],
+          ["Phone", lead.phone ?? "—"],
+          ["Email", lead.email ?? "—"],
+          ["Preferred contact", lead.preferredContact ?? "—"],
+          ["Message", lead.message ?? "—"],
+        ];
   if (lead.leadType === "trade_sell")
     rows.push(
       ["VIN", lead.details.vin ?? "—"],
       ["Mileage", `${lead.details.mileage?.toLocaleString("en-US") ?? "—"} mi`],
       ["WeChat", lead.details.wechat ?? "—"],
     );
-  rows.push(...financingDetails(lead), ["Source", lead.sourceUrl ?? "—"]);
+  if (lead.leadType !== "preapproval")
+    rows.push(...financingDetails(lead), ["Source", lead.sourceUrl ?? "—"]);
   const adminUrl = `${env.APP_ORIGIN ?? ""}/admin/leads/${encodeURIComponent(lead.id)}`;
   const text = [
     title,

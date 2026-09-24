@@ -51,6 +51,7 @@ import { LeadForm } from "../components/LeadForm";
 import { VehiclePaymentCalculator } from "../components/VehiclePaymentCalculator";
 import { FinancingSettings } from "../components/FinancingSettings";
 import { FinancingSummary } from "../components/FinancingSummary";
+import { PreapprovalApplicationPanel } from "../components/PreapprovalApplicationPanel";
 import {
   LeadNotificationPanel,
   notificationLabel,
@@ -3487,6 +3488,7 @@ function AdminLeadsPage() {
             ...lead,
             emailStatus: updated.emailStatus,
             notification: updated.notification,
+            details: updated.details,
           }
         : lead;
     setLeads((old) => old.map(merge));
@@ -3556,10 +3558,14 @@ function AdminLeadsPage() {
                         : "General inquiry")}
                   </small>
                   <p>
-                    {lead.message ||
-                      (lead.details.vin
-                        ? `VIN ${lead.details.vin}`
-                        : "No message provided.")}
+                    {lead.details.preapproval
+                      ? lead.details.preapproval.status === "deleted"
+                        ? "Private application removed."
+                        : "Private application received. Open to review."
+                      : lead.message ||
+                        (lead.details.vin
+                          ? `VIN ${lead.details.vin}`
+                          : "No message provided.")}
                   </p>
                   <small>Email: {notificationLabel(lead.emailStatus)}</small>
                 </span>
@@ -3646,28 +3652,32 @@ function LeadDetail({
           <Icon name="arrow" size={16} />
         </Link>
       )}
-      <div className="lead-contact-grid">
-        <a
-          href={
-            lead.phone ? `tel:${lead.phone.replace(/[^\d+]/g, "")}` : undefined
-          }
-        >
-          <span>Phone</span>
-          <strong>{lead.phone ?? "Not provided"}</strong>
-        </a>
-        <a href={lead.email ? `mailto:${lead.email}` : undefined}>
-          <span>Email</span>
-          <strong>{lead.email ?? "Not provided"}</strong>
-        </a>
-        <div>
-          <span>Prefers</span>
-          <strong>{lead.preferredContact ?? "Not specified"}</strong>
+      {!lead.details.preapproval && (
+        <div className="lead-contact-grid">
+          <a
+            href={
+              lead.phone
+                ? `tel:${lead.phone.replace(/[^\d+]/g, "")}`
+                : undefined
+            }
+          >
+            <span>Phone</span>
+            <strong>{lead.phone ?? "Not provided"}</strong>
+          </a>
+          <a href={lead.email ? `mailto:${lead.email}` : undefined}>
+            <span>Email</span>
+            <strong>{lead.email ?? "Not provided"}</strong>
+          </a>
+          <div>
+            <span>Prefers</span>
+            <strong>{lead.preferredContact ?? "Not specified"}</strong>
+          </div>
+          <div>
+            <span>Received</span>
+            <strong>{new Date(lead.createdAt).toLocaleString()}</strong>
+          </div>
         </div>
-        <div>
-          <span>Received</span>
-          <strong>{new Date(lead.createdAt).toLocaleString()}</strong>
-        </div>
-      </div>
+      )}
       {lead.leadType === "trade_sell" && (
         <div className="lead-contact-grid lead-trade-details">
           <div>
@@ -3688,10 +3698,26 @@ function LeadDetail({
           </div>
         </div>
       )}
-      <div className="lead-message">
-        <span>Message</span>
-        <p>{lead.message || "No message provided."}</p>
-      </div>
+      {!lead.details.preapproval && (
+        <div className="lead-message">
+          <span>Message</span>
+          <p>{lead.message || "No message provided."}</p>
+        </div>
+      )}
+      {lead.details.preapproval && (
+        <PreapprovalApplicationPanel
+          leadId={lead.id}
+          metadata={lead.details.preapproval}
+          onDeleted={(metadata) => {
+            const next = {
+              ...lead,
+              details: { ...lead.details, preapproval: metadata },
+            };
+            setDraft((old) => ({ ...old, details: next.details }));
+            onNotificationUpdate(next);
+          }}
+        />
+      )}
       {lead.details.financing && (
         <FinancingSummary snapshot={lead.details.financing} />
       )}

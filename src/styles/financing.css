@@ -471,6 +471,133 @@
   line-height: 1.65;
 }
 
+.preapproval-fields,
+.preapproval-residence {
+  min-inline-size: 0;
+  margin: 22px 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.preapproval-fields > legend,
+.preapproval-residence > legend {
+  margin-bottom: 12px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.preapproval-fields > label,
+.preapproval-fields > .form-grid {
+  margin-top: 18px;
+}
+
+.preapproval-notice {
+  border-left: 3px solid var(--red);
+  background: var(--bone);
+  padding: 12px 14px;
+}
+
+.preapproval-fields input[aria-invalid="true"],
+.preapproval-fields select[aria-invalid="true"] {
+  border-color: var(--red-dark);
+}
+
+.lead-form .preapproval-consent {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: row;
+  gap: 11px;
+}
+
+.preapproval-consent input {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 3px 0 0;
+  accent-color: var(--ink);
+}
+
+.lead-form .preapproval-consent > span {
+  color: #565b55;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.65;
+  text-transform: none;
+}
+
+.preapproval-consent a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.preapproval-admin h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.preapproval-admin .field {
+  margin: 18px 0 12px;
+}
+
+.preapproval-admin > .payment-help {
+  margin-bottom: 12px;
+}
+
+.preapproval-private {
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: var(--paper);
+}
+
+.preapproval-private dl {
+  margin: 16px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.preapproval-private dl > div {
+  padding-block: 8px;
+}
+
+.preapproval-private dt {
+  margin-bottom: 3px;
+  color: #656963;
+  font-size: 11px;
+}
+
+.preapproval-private dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.preapproval-private .preapproval-ssn {
+  display: inline-block;
+  margin-right: 15px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+.preapproval-delete {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.preapproval-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.preapproval-admin .button {
+  max-width: 100%;
+  white-space: normal;
+}
+
 @media (max-width: 640px) {
   .payment-vehicle-price,
   .payment-panel {

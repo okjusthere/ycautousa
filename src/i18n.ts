@@ -288,11 +288,11 @@ export const messages = {
     legal: {
       privacy: "Privacy policy",
       terms: "Terms of use",
-      updated: "Last updated September 4, 2026",
+      updated: "Last updated September 24, 2026",
       infoTitle: "Information we receive",
-      info: "When you contact YC Auto USA, we receive the details you choose to share, including your name, contact details and message. Trade/Sell requests may also include a VIN, vehicle mileage and WeChat ID.",
+      info: "When you contact YC Auto USA, we receive the details you choose to share, including your name, contact details and message. Trade/Sell requests may also include a VIN, vehicle mileage and WeChat ID. A pre-approval request collects your name, Social Security number, residential address, time at that address, phone number, email, and any financing selections you provide.",
       useTitle: "How we use it",
-      use: "We use submitted information to respond to your request, evaluate a vehicle you may trade or sell, keep basic lead records, and improve the website. We do not sell lead information or send it to vehicle-data vendors.",
+      use: "We use submitted information to respond to your request, evaluate a vehicle you may trade or sell, and keep customer records. Pre-approval identity and contact details are encrypted separately; authorized dealership administrators must explicitly open them, and access is recorded. Notification emails contain a receipt and protected admin link, not your application details. Submitting this form does not itself run a credit check, transmit an application to a lender, or approve financing. We do not sell customer information or send it to vehicle-data vendors. Contact us to request a correction or deletion; do not include your Social Security number in email or ordinary messages.",
       analyticsTitle: "Cookies and analytics",
       analytics:
         "The site may use Cloudflare Web Analytics for aggregate traffic measurement. The website does not require an account or use advertising trackers to browse inventory.",
@@ -588,11 +588,11 @@ export const messages = {
     legal: {
       privacy: "隐私政策",
       terms: "使用条款",
-      updated: "更新日期：2026 年 9 月 4 日",
+      updated: "更新日期：2026 年 9 月 24 日",
       infoTitle: "我们收集的信息",
-      info: "当你联系 YC Auto USA 时，我们会收到你主动提交的姓名、联系方式和留言。置换/卖车申请还可能包含 VIN 车架号、车辆里程和微信号。",
+      info: "当你联系 YC Auto USA 时，我们会收到你主动提交的姓名、联系方式和留言。置换/卖车申请还可能包含 VIN 车架号、车辆里程和微信号。预批申请会收集你的姓名、社安号、居住地址、在该地址的居住时间、电话、邮箱，以及你选择的贷款估算条件。",
       useTitle: "信息用途",
-      use: "我们使用这些信息回复咨询、评估你希望置换或出售的车辆、保存基本客户记录并改善网站。我们不会出售客户资料，也不会把资料发送给车辆数据供应商。",
+      use: "我们使用这些信息回复咨询、评估你希望置换或出售的车辆，并保存客户记录。预批申请的身份及联系方式单独加密保存；获授权的车行管理员需主动打开查看，查看操作会被记录。通知邮件只包含收件提示和受保护的后台链接，不包含申请资料。提交此表单本身不会查询信用、向贷款机构递交申请或批准贷款。我们不会出售客户资料，也不会把资料发送给车辆数据供应商。如需更正或删除资料，请联系我们；请勿在邮件或普通留言中提供社安号。",
       analyticsTitle: "Cookie 与统计",
       analytics:
         "网站可能使用 Cloudflare Web Analytics 进行汇总流量统计。浏览库存无需注册账号，网站也不使用广告追踪器。",

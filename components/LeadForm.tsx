@@ -9,23 +9,58 @@ import {
   financingSelectionSchema,
   type FinancingSelection,
 } from "../lib/financing";
-import { financingCopy, financingMoney } from "../src/financing-copy";
+import {
+  financingCopy,
+  financingMoney,
+  preapprovalCopy,
+} from "../src/financing-copy";
+import {
+  preapprovalInputSchema,
+  preapprovalPhoneSchema,
+  type PreapprovalInput,
+} from "../lib/preapproval";
+import {
+  PreapprovalFields,
+  type PreapprovalFieldErrors,
+} from "./PreapprovalFields";
+
+async function submissionFingerprint(payload: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+  } finally {
+    bytes.fill(0);
+  }
+}
 
 export function LeadForm({
   vehicle,
   type = "availability",
   compact = false,
   financing,
+  financingInvalid = false,
 }: {
   vehicle?: Vehicle | null;
-  type?: "availability" | "test_drive" | "contact" | "trade_sell" | "financing";
+  type?:
+    | "availability"
+    | "test_drive"
+    | "contact"
+    | "trade_sell"
+    | "financing"
+    | "preapproval";
   compact?: boolean;
   financing?: FinancingSelection;
+  financingInvalid?: boolean;
 }) {
   const { copy, isZh, path, locale } = useLocale();
   const isTrade = type === "trade_sell";
   const isFinancing = type === "financing";
+  const isPreapproval = type === "preapproval";
   const financeCopy = financingCopy[locale];
+  const preapprovalText = preapprovalCopy[locale];
   const validFinancing =
     financingSelectionSchema.safeParse(financing).success &&
     vehicle?.priceCents != null &&
@@ -34,26 +69,43 @@ export function LeadForm({
     "idle" | "sending" | "success" | "error"
   >("idle");
   const [error, setError] = useState("");
+  const [applicationErrors, setApplicationErrors] =
+    useState<PreapprovalFieldErrors>({});
   const verification = useTurnstile(status !== "success");
   const turnstileToken = verification.token;
   const submitting = useRef(false);
   const mounted = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const pendingRequest = useRef<AbortController | null>(null);
   const submission = useRef<{ fingerprint: string; key: string } | null>(null);
   useEffect(() => {
     mounted.current = true;
+    const formElement = formRef.current;
     return () => {
       mounted.current = false;
+      pendingRequest.current?.abort();
+      submission.current = null;
+      if (isPreapproval) formElement?.reset();
     };
-  }, []);
+  }, [isPreapproval]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current) return;
     setError("");
+    setApplicationErrors({});
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     if (isFinancing && !validFinancing) {
       setStatus("error");
       setError(financeCopy.selectionRequired);
+      return;
+    }
+    if (
+      isPreapproval &&
+      (financingInvalid || (financing !== undefined && !validFinancing))
+    ) {
+      setStatus("error");
+      setError(financeCopy.downPaymentError);
       return;
     }
     if (!turnstileToken) {
@@ -63,6 +115,62 @@ export function LeadForm({
     }
     const phone = String(form.get("phone") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
+    let preapproval: PreapprovalInput | undefined;
+    if (isPreapproval) {
+      const name = String(form.get("name") ?? "").trim();
+      const emailInput = formElement.elements.namedItem(
+        "email",
+      ) as HTMLInputElement;
+      if (
+        name.length < 2 ||
+        !preapprovalPhoneSchema.safeParse(phone).success ||
+        !email
+      ) {
+        setStatus("error");
+        setError(preapprovalText.requiredContact);
+        return;
+      }
+      if (!emailInput.validity.valid) {
+        setStatus("error");
+        setError(financeCopy.emailInvalid);
+        return;
+      }
+      const wholeNumber = (field: string) => {
+        const raw = String(form.get(field) ?? "").trim();
+        return /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+      };
+      const result = preapprovalInputSchema.safeParse({
+        ssn: String(form.get("ssn") ?? ""),
+        addressLine1: String(form.get("addressLine1") ?? ""),
+        addressLine2: String(form.get("addressLine2") ?? ""),
+        city: String(form.get("city") ?? ""),
+        state: String(form.get("state") ?? ""),
+        postalCode: String(form.get("postalCode") ?? ""),
+        residenceYears: wholeNumber("residenceYears"),
+        residenceMonths: wholeNumber("residenceMonths"),
+        consent: form.get("consent") === "on",
+      });
+      form.delete("ssn");
+      if (!result.success) {
+        const errors: PreapprovalFieldErrors = {};
+        for (const issue of result.error.issues) {
+          const field = String(issue.path[0]) as keyof PreapprovalFieldErrors;
+          errors[field] =
+            field === "ssn"
+              ? preapprovalText.invalidSsn
+              : field === "consent"
+                ? preapprovalText.consentRequired
+                : field.startsWith("residence")
+                  ? preapprovalText.invalidResidence
+                  : preapprovalText.invalidAddress;
+        }
+        setApplicationErrors(errors);
+        setStatus("error");
+        setError(preapprovalText.invalidFields);
+        return;
+      }
+      preapproval = result.data;
+    }
     if (isFinancing) {
       const name = String(form.get("name") ?? "").trim();
       const emailInput = formElement.elements.namedItem(
@@ -114,11 +222,12 @@ export function LeadForm({
       preferredContact:
         form.get("preferredContact") ||
         (phone ? "phone" : email ? "email" : "wechat"),
-      message: form.get("message") || null,
+      message: isPreapproval ? null : form.get("message") || null,
       ...(isTrade
         ? { vin, mileage: Number(mileage), wechat: wechat || null }
         : {}),
-      ...(isFinancing ? { financing } : {}),
+      ...(isFinancing || (isPreapproval && financing) ? { financing } : {}),
+      ...(isPreapproval ? { preapproval } : {}),
       sourceUrl: window.location.href,
       referrer: document.referrer || null,
       utm: Object.fromEntries(
@@ -126,24 +235,30 @@ export function LeadForm({
       ),
       honeypot: form.get("website") || "",
     };
-    const fingerprint = JSON.stringify(payload);
-    if (submission.current?.fingerprint !== fingerprint)
-      submission.current = { fingerprint, key: crypto.randomUUID() };
     submitting.current = true;
     setStatus("sending");
+    const controller = new AbortController();
+    pendingRequest.current = controller;
     try {
+      const fingerprint = await submissionFingerprint(payload);
+      if (!mounted.current || controller.signal.aborted) return;
+      if (submission.current?.fingerprint !== fingerprint)
+        submission.current = { fingerprint, key: crypto.randomUUID() };
       await mutate(
         "/api/leads",
         "POST",
         { ...payload, turnstileToken },
         {
           headers: { "Idempotency-Key": submission.current.key },
+          signal: controller.signal,
+          ...(isPreapproval ? { cache: "no-store" as const } : {}),
         },
       );
       if (!mounted.current) return;
       submission.current = null;
-      setStatus("success");
       formElement.reset();
+      setApplicationErrors({});
+      setStatus("success");
     } catch (submissionError) {
       if (!mounted.current) return;
       setStatus("error");
@@ -151,11 +266,16 @@ export function LeadForm({
       // and idempotency key, but obtain a fresh token before retrying.
       verification.refresh();
       setError(
-        !isZh && submissionError instanceof Error
-          ? submissionError.message
-          : copy.lead.tryAgain,
+        isPreapproval
+          ? preapprovalText.submitError
+          : !isZh && submissionError instanceof Error
+            ? submissionError.message
+            : copy.lead.tryAgain,
       );
     } finally {
+      preapproval = undefined;
+      if (isPreapproval) payload.preapproval = undefined;
+      if (pendingRequest.current === controller) pendingRequest.current = null;
       submitting.current = false;
     }
   }
@@ -166,18 +286,22 @@ export function LeadForm({
           <Icon name="check" />
         </span>
         <h3>
-          {isFinancing
-            ? financeCopy.received
-            : isTrade
-              ? copy.lead.tradeReceived
-              : copy.lead.received}
+          {isPreapproval
+            ? preapprovalText.received
+            : isFinancing
+              ? financeCopy.received
+              : isTrade
+                ? copy.lead.tradeReceived
+                : copy.lead.received}
         </h3>
         <p>
-          {isFinancing
-            ? financeCopy.thanks
-            : isTrade
-              ? copy.lead.tradeThanks
-              : copy.lead.thanks}
+          {isPreapproval
+            ? preapprovalText.thanks
+            : isFinancing
+              ? financeCopy.thanks
+              : isTrade
+                ? copy.lead.tradeThanks
+                : copy.lead.thanks}
         </p>
         <button
           className="text-button"
@@ -186,18 +310,22 @@ export function LeadForm({
             setStatus("idle");
           }}
         >
-          {isFinancing
-            ? financeCopy.another
-            : isTrade
-              ? copy.lead.anotherTrade
-              : copy.lead.another}{" "}
+          {isPreapproval
+            ? preapprovalText.another
+            : isFinancing
+              ? financeCopy.another
+              : isTrade
+                ? copy.lead.anotherTrade
+                : copy.lead.another}{" "}
           <Icon name="arrow" size={16} />
         </button>
       </div>
     );
   return (
     <form
+      ref={formRef}
       className={`lead-form ${compact ? "lead-form--compact" : ""}`}
+      autoComplete={isPreapproval ? "off" : undefined}
       onSubmit={submit}
       onChange={(event) => {
         // Turnstile owns hidden fields too; only user edits start a new request.
@@ -218,7 +346,7 @@ export function LeadForm({
           </span>
         </div>
       )}
-      {isFinancing && financing && validFinancing && (
+      {(isFinancing || isPreapproval) && financing && validFinancing && (
         <dl
           className="financing-lead-summary"
           aria-label={financeCopy.selectionSummary}
@@ -249,13 +377,18 @@ export function LeadForm({
           {financeCopy.selectionRequired}
         </p>
       )}
+      {isPreapproval && financingInvalid && (
+        <p className="form-error" role="status">
+          {financeCopy.downPaymentError}
+        </p>
+      )}
       <div className="form-grid">
         <label>
-          <span>{copy.lead.name}</span>
+          <span>{isPreapproval ? preapprovalText.name : copy.lead.name}</span>
           <input
             name="name"
             disabled={status === "sending"}
-            aria-label={copy.lead.name}
+            aria-label={isPreapproval ? preapprovalText.name : copy.lead.name}
             required
             minLength={2}
             maxLength={100}
@@ -263,28 +396,30 @@ export function LeadForm({
           />
         </label>
         <label>
-          <span>{copy.lead.phone}</span>
+          <span>{isPreapproval ? preapprovalText.phone : copy.lead.phone}</span>
           <input
             name="phone"
             disabled={status === "sending"}
-            aria-label={copy.lead.phone}
+            aria-label={isPreapproval ? preapprovalText.phone : copy.lead.phone}
+            required={isPreapproval}
             type="tel"
             maxLength={40}
             placeholder="(718) 555-0123"
           />
         </label>
         <label>
-          <span>{copy.lead.email}</span>
+          <span>{isPreapproval ? preapprovalText.email : copy.lead.email}</span>
           <input
             name="email"
             disabled={status === "sending"}
-            aria-label={copy.lead.email}
+            aria-label={isPreapproval ? preapprovalText.email : copy.lead.email}
+            required={isPreapproval}
             type="email"
             maxLength={254}
             placeholder="you@example.com"
           />
         </label>
-        {!isTrade && !isFinancing && (
+        {!isTrade && !isFinancing && !isPreapproval && (
           <label>
             <span>{copy.lead.preferred}</span>
             <select
@@ -349,23 +484,31 @@ export function LeadForm({
       </div>
       {isTrade && <p className="form-hint">{copy.lead.contactHint}</p>}
       {isFinancing && <p className="form-hint">{financeCopy.contactHint}</p>}
-      <label>
-        <span>{copy.lead.message}</span>
-        <textarea
-          name="message"
+      {isPreapproval && (
+        <PreapprovalFields
           disabled={status === "sending"}
-          aria-label={copy.lead.message}
-          rows={compact ? 3 : 4}
-          maxLength={3000}
-          placeholder={
-            isFinancing
-              ? financeCopy.messagePlaceholder
-              : vehicle
-                ? copy.lead.vehicleMessage
-                : copy.lead.helpMessage
-          }
+          errors={applicationErrors}
         />
-      </label>
+      )}
+      {!isPreapproval && (
+        <label>
+          <span>{copy.lead.message}</span>
+          <textarea
+            name="message"
+            disabled={status === "sending"}
+            aria-label={copy.lead.message}
+            rows={compact ? 3 : 4}
+            maxLength={3000}
+            placeholder={
+              isFinancing
+                ? financeCopy.messagePlaceholder
+                : vehicle
+                  ? copy.lead.vehicleMessage
+                  : copy.lead.helpMessage
+            }
+          />
+        </label>
+      )}
       <label className="honeypot" aria-hidden="true">
         Website
         <input name="website" tabIndex={-1} autoComplete="off" />
@@ -405,17 +548,23 @@ export function LeadForm({
         </p>
         <button
           className="button button--red"
-          disabled={status === "sending" || (isFinancing && !validFinancing)}
+          disabled={
+            status === "sending" ||
+            (isFinancing && !validFinancing) ||
+            (isPreapproval && financingInvalid)
+          }
         >
           {status === "sending"
             ? copy.lead.sending
-            : isFinancing
-              ? financeCopy.submit
-              : type === "test_drive"
-                ? copy.lead.requestDrive
-                : isTrade
-                  ? copy.lead.submitTrade
-                  : copy.lead.send}{" "}
+            : isPreapproval
+              ? preapprovalText.submit
+              : isFinancing
+                ? financeCopy.submit
+                : type === "test_drive"
+                  ? copy.lead.requestDrive
+                  : isTrade
+                    ? copy.lead.submitTrade
+                    : copy.lead.send}{" "}
           <Icon name="arrow" size={17} />
         </button>
       </div>

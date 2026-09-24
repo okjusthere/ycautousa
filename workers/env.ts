@@ -56,6 +56,7 @@ export type Env = {
   EMAIL_FROM?: string;
   EMAIL_TO?: string;
   IP_HASH_SALT?: string;
+  PREAPPROVAL_KEYS?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD_TAG?: string;
   ENVIRONMENT?: string;

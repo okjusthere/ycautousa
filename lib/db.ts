@@ -18,6 +18,7 @@ import {
   readNotification,
 } from "./lead-delivery";
 import { financingSnapshotSchema, parseFinancingConfig } from "./financing";
+import { preapprovalMetadataSchema } from "./preapproval";
 import type { SettingsInput } from "./validation";
 
 export type D1Result<T = unknown> = {
@@ -130,8 +131,12 @@ export function rowToLead(row: LeadRow, vehicle?: Lead["vehicle"]): Lead {
     if (parsed && typeof parsed === "object") {
       const candidate = parsed as Record<string, unknown>;
       const financing = financingSnapshotSchema.safeParse(candidate.financing);
+      const preapproval = preapprovalMetadataSchema.safeParse(
+        candidate.preapproval,
+      );
       details = {
         ...(financing.success ? { financing: financing.data } : {}),
+        ...(preapproval.success ? { preapproval: preapproval.data } : {}),
         ...(typeof candidate.vin === "string" ? { vin: candidate.vin } : {}),
         ...(typeof candidate.mileage === "number"
           ? { mileage: candidate.mileage }
@@ -738,6 +743,59 @@ export async function updateLead(
     .bind(status ?? null, adminNotes ?? null, nowIso(), id)
     .run();
 }
+
+/** Sensitive ciphertext never participates in ordinary lead queries. */
+export async function getPreapprovalCiphertext(
+  db: D1Like,
+  leadId: string,
+): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT ciphertext FROM preapproval_applications WHERE lead_id=?")
+    .bind(leadId)
+    .first<{ ciphertext: string }>();
+  return row?.ciphertext ?? null;
+}
+
+/** Keep the non-sensitive receipt while deleting the active encrypted payload. */
+export async function deletePreapprovalApplication(
+  db: D1Like,
+  leadId: string,
+  adminEmail: string,
+): Promise<boolean> {
+  const auditId = uid("audit");
+  const at = nowIso();
+  await atomicBatch(db, [
+    db
+      .prepare(
+        `INSERT INTO audit_logs (id,admin_email,action,entity_type,entity_id,details_json,created_at)
+       SELECT ?,?,'preapproval_deleted','lead',l.id,'{}',?
+       FROM leads l JOIN preapproval_applications p ON p.lead_id=l.id
+       WHERE l.id=? AND l.lead_type='preapproval'`,
+      )
+      .bind(auditId, adminEmail, at, leadId),
+    db
+      .prepare(
+        `UPDATE leads SET details_json=json_set(
+         CASE WHEN json_valid(details_json) THEN details_json ELSE '{}' END,
+         '$.preapproval.status','deleted',
+         '$.preapproval.submittedAt',COALESCE(
+           json_extract(CASE WHEN json_valid(details_json) THEN details_json ELSE '{}' END,'$.preapproval.submittedAt'),created_at),
+         '$.preapproval.deletedAt',?),updated_at=?
+       WHERE id=? AND EXISTS (SELECT 1 FROM audit_logs WHERE id=?)`,
+      )
+      .bind(at, at, leadId, auditId),
+    db
+      .prepare(
+        "DELETE FROM preapproval_applications WHERE lead_id=? AND EXISTS (SELECT 1 FROM audit_logs WHERE id=?)",
+      )
+      .bind(leadId, auditId),
+  ]);
+  return !!(await db
+    .prepare("SELECT id FROM audit_logs WHERE id=?")
+    .bind(auditId)
+    .first<{ id: string }>());
+}
+
 export async function addAudit(
   db: D1Like,
   adminEmail: string,
@@ -746,7 +804,7 @@ export async function addAudit(
   entityId: string | null,
   details: Record<string, unknown> = {},
 ): Promise<void> {
-  await db
+  const result = await db
     .prepare(
       "INSERT INTO audit_logs (id,admin_email,action,entity_type,entity_id,details_json,created_at) VALUES (?,?,?,?,?,?,?)",
     )
@@ -760,6 +818,7 @@ export async function addAudit(
       nowIso(),
     )
     .run();
+  if (!result.success) throw new Error("Audit record could not be saved");
 }
 export async function listAudit(db: D1Like, limit = 100): Promise<AuditLog[]> {
   const rows = await db

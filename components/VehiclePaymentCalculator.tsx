@@ -288,7 +288,6 @@ export function VehiclePaymentCalculator({
           <button
             className="button button--red payment-inquiry-button"
             type="button"
-            disabled={!selection}
             onClick={() => setContactOpen(true)}
           >
             {copy.inquiry}
@@ -300,8 +299,9 @@ export function VehiclePaymentCalculator({
             <p className="payment-help">{copy.inquiryHelp}</p>
             <LeadForm
               vehicle={vehicle}
-              type="financing"
+              type="preapproval"
               financing={selection ?? undefined}
+              financingInvalid={downCents === null}
               compact
             />
           </div>

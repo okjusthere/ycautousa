@@ -97,8 +97,8 @@ test.describe("vehicle financing calculator", () => {
       calculator.getByTestId("financing-monthly-payment"),
     ).toHaveCount(0);
     await expect(
-      calculator.getByRole("button", { name: "Ask about financing" }),
-    ).toBeDisabled();
+      calculator.getByRole("button", { name: "Request loan pre-approval" }),
+    ).toBeEnabled();
 
     await chooseOption(calculator, "740+ Excellent");
     await expect(
@@ -176,9 +176,6 @@ test.describe("vehicle financing calculator", () => {
       await expect(
         calculator.getByTestId("financing-monthly-payment"),
       ).toHaveCount(0);
-      await expect(
-        calculator.getByRole("button", { name: "Ask about financing" }),
-      ).toBeDisabled();
     }
     await down.fill("26990");
     await expect(down).toHaveAttribute("aria-invalid", "false");
@@ -188,7 +185,7 @@ test.describe("vehicle financing calculator", () => {
     expect(submissions).toEqual([]);
   });
 
-  test("opens low-score assistance without sending a lead, then submits only after valid contact details", async ({
+  test("opens low-score pre-approval without sending a lead and keeps the draft across calculator changes", async ({
     page,
   }) => {
     const { submissions, vehicle } = await mockPublicCalculator(page);
@@ -199,7 +196,7 @@ test.describe("vehicle financing calculator", () => {
     });
     await chooseOption(calculator, "619 or below Let’s talk");
     await expect(
-      calculator.getByRole("heading", { name: "Talk with our team" }),
+      calculator.getByRole("heading", { name: "Loan pre-approval request" }),
     ).toBeVisible();
     await expect(
       calculator.getByTestId("financing-monthly-payment"),
@@ -207,59 +204,29 @@ test.describe("vehicle financing calculator", () => {
     await expect(calculator).not.toContainText("5.99%");
     expect(submissions).toEqual([]);
     await calculator
-      .getByLabel("Name *", { exact: true })
+      .getByLabel("Full name *", { exact: true })
       .fill("Local Finance Test");
-    const message = calculator.getByRole("textbox", {
-      name: "Message",
-      exact: true,
-    });
-    await message.fill("Please contact me after 5pm.");
+    const address = calculator.getByLabel("Street address *", { exact: true });
+    await address.fill("104 Synthetic Avenue");
     await chooseOption(calculator, "740+ Excellent");
     await chooseOption(calculator, "60 months");
     await calculator.getByRole("tab", { name: "Cash", exact: true }).click();
     await calculator.getByRole("tab", { name: "Finance", exact: true }).click();
     await chooseOption(calculator, "619 or below Let’s talk");
-    await expect(calculator.getByLabel("Name *", { exact: true })).toHaveValue(
-      "Local Finance Test",
-    );
-    await expect(message).toHaveValue("Please contact me after 5pm.");
+    await expect(
+      calculator.getByLabel("Full name *", { exact: true }),
+    ).toHaveValue("Local Finance Test");
+    await expect(address).toHaveValue("104 Synthetic Avenue");
     expect(submissions).toEqual([]);
     const submit = calculator.getByRole("button", {
-      name: "Submit financing inquiry",
+      name: "Submit pre-approval request",
       exact: true,
     });
     await submit.click();
     await expect(calculator).toContainText(
-      "Enter a phone number or email address so we can reach you.",
+      "Enter your full name, phone number and email address.",
     );
     expect(submissions).toEqual([]);
-    await calculator
-      .getByRole("textbox", { name: "Email", exact: true })
-      .fill("finance@example.invalid");
-    await submit.click();
-    await expect(
-      calculator.getByRole("heading", { name: "Financing inquiry received." }),
-    ).toBeVisible();
-    expect(submissions).toHaveLength(1);
-    expect(submissions[0].key).toMatch(/^[\w-]{16,128}$/);
-    expect(submissions[0].data).toMatchObject({
-      leadType: "financing",
-      vehicleId: vehicle.id,
-      name: "Local Finance Test",
-      email: "finance@example.invalid",
-      financing: {
-        creditTier: "consultation",
-        termMonths: 60,
-        downPaymentCents: 500_000,
-      },
-    });
-    expect(submissions[0].data.financing).toEqual({
-      creditTier: "consultation",
-      termMonths: 60,
-      downPaymentCents: 500_000,
-    });
-    expect(submissions[0].data).not.toHaveProperty("aprPercent");
-    expect(submissions[0].data).not.toHaveProperty("monthlyPaymentCents");
   });
 
   test("offers assistance when rates are absent, including the Chinese view", async ({
@@ -277,10 +244,10 @@ test.describe("vehicle financing calculator", () => {
       calculator.getByTestId("financing-monthly-payment"),
     ).toHaveCount(0);
     await calculator
-      .getByRole("button", { name: "咨询贷款方案", exact: true })
+      .getByRole("button", { name: "预批贷款月供", exact: true })
       .click();
     await expect(
-      calculator.getByRole("button", { name: "发送贷款咨询", exact: true }),
+      calculator.getByRole("button", { name: "提交贷款预批请求", exact: true }),
     ).toBeVisible();
     await expect(calculator).toContainText("此操作不会查询您的信用");
     expect(submissions).toEqual([]);

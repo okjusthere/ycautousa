@@ -22,4 +22,10 @@ Save changes, then refresh a vehicle page to verify the new estimate. Saving unr
 
 The calculator uses the listed vehicle price minus down payment. It excludes taxes, registration, documentation fees, and trade-in credit. Visitors start with $5,000 down (capped at the vehicle price) and 72 months, then choose their own credit range. Sold vehicles and listings without a positive price do not show the calculator.
 
-The 619-or-below option always offers a contact form instead of a monthly payment; it is not a credit rejection. Only an explicit form submission creates a financing inquiry and queues the store email. The Leads inbox and notification include the vehicle, selected range, down payment, term, and the estimate snapshot when available. Credit selections are self-reported; the website does not run credit checks or submit loan applications.
+The 619-or-below option opens the pre-approval form instead of showing a monthly payment; it is not a credit rejection. The pre-approval button is also available before a credit range is selected. Only an explicit form submission creates a request and queues the store notification. Credit selections are self-reported; the website does not run credit checks, send applications to lenders, or approve loans.
+
+## Private pre-approval applications
+
+The form requires name, phone, email, SSN, residential address, residence duration and collection consent. Identity and contact details are encrypted separately from the ordinary Leads inbox. Notification emails only announce the request and link to the protected lead.
+
+Open a pre-approval lead, choose a purpose, then click **View full application (including SSN)**. The view is audited and clears after 60 seconds, when the tab is hidden, or when the browser loses focus. Use **Show SSN** only when needed. Avoid copying private details into ordinary notes or email. **Delete private application data** clears the active encrypted application after confirmation while retaining the lead receipt and audit history. See [pre-approval operations](PREAPPROVAL.md) for retention and key recovery details.

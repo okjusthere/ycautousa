@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LEAD_STATUSES, VEHICLE_STATUSES } from "./types";
 import { financingConfigSchema, financingSelectionSchema } from "./financing";
+import { preapprovalInputSchema, preapprovalPhoneSchema } from "./preapproval";
 
 export const vinSchema = z
   .string()
@@ -61,9 +62,11 @@ export const leadInputSchema = z
         "contact",
         "trade_sell",
         "financing",
+        "preapproval",
       ])
       .default("contact"),
     financing: financingSelectionSchema.optional(),
+    preapproval: preapprovalInputSchema.optional(),
     name: z.string().trim().min(2).max(100),
     phone: z.string().trim().max(40).nullable().optional(),
     email: z.string().trim().email().max(254).nullable().optional(),
@@ -85,14 +88,14 @@ export const leadInputSchema = z
     honeypot: z.string().max(200).optional().default(""),
   })
   .superRefine((value, context) => {
-    if (value.leadType === "financing") {
+    if (value.leadType === "financing" || value.leadType === "preapproval") {
       if (!value.vehicleId)
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "A vehicle is required for a financing inquiry",
           path: ["vehicleId"],
         });
-      if (!value.financing)
+      if (value.leadType === "financing" && !value.financing)
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Financing selections are required",
@@ -103,6 +106,32 @@ export const leadInputSchema = z
         code: z.ZodIssueCode.custom,
         message: "Financing selections require a financing inquiry",
         path: ["financing"],
+      });
+    }
+    if (value.leadType === "preapproval") {
+      if (!value.preapproval)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Pre-approval application details are required",
+          path: ["preapproval"],
+        });
+      if (!preapprovalPhoneSchema.safeParse(value.phone).success)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A valid contact phone number is required",
+          path: ["phone"],
+        });
+      if (!value.email)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "An email address is required",
+          path: ["email"],
+        });
+    } else if (value.preapproval !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Application details require a pre-approval request",
+        path: ["preapproval"],
       });
     }
     const contactProvided =
@@ -136,6 +165,10 @@ export const leadUpdateSchema = z.object({
   status: z.enum(LEAD_STATUSES).optional(),
   adminNotes: z.string().trim().max(5000).optional(),
 });
+
+export const preapprovalDeleteSchema = z
+  .object({ confirm: z.literal(true) })
+  .strict();
 
 export const settingsSchema = z.object({
   // Omission is a legacy client, while null explicitly disables estimates.

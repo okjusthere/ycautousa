@@ -1,5 +1,9 @@
 import { isRecord } from "./http";
 import {
+  preapprovalMetadataSchema,
+  preapprovalStoredDataSchema,
+} from "../lib/preapproval";
+import {
   financingConfigSchema,
   financingSnapshotSchema,
 } from "../lib/financing";
@@ -147,6 +151,8 @@ export function validLead(value: unknown): boolean {
     ]) &&
     (value.notification == null || validNotification(value.notification)) &&
     isRecord(value.details) &&
+    (value.details.preapproval === undefined ||
+      preapprovalMetadataSchema.safeParse(value.details.preapproval).success) &&
     (value.details.financing === undefined ||
       financingSnapshotSchema.safeParse(value.details.financing).success) &&
     (value.details.vin === undefined ||
@@ -194,6 +200,13 @@ export function validMutationResponse(
 ): boolean {
   if (!isRecord(value)) return false;
   const pathname = path.split("?")[0];
+  if (/^\/api\/admin\/leads\/[^/]+\/preapproval\/view$/.test(pathname))
+    return (
+      method === "POST" &&
+      preapprovalStoredDataSchema.safeParse(value.application).success
+    );
+  if (/^\/api\/admin\/leads\/[^/]+\/preapproval\/delete$/.test(pathname))
+    return method === "POST" && value.ok === true && validLead(value.lead);
   if (pathname === "/api/admin/settings")
     return (
       validSettings(value.settings) &&

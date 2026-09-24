@@ -5,6 +5,8 @@ import {
   ensureImageCover,
   getImageById,
   getLead,
+  getPreapprovalCiphertext,
+  deletePreapprovalApplication,
   getSettings,
   getVehicleById,
   getVehicleBySlug,
@@ -37,6 +39,7 @@ import { decodeVin, normalizeVin } from "../lib/vin";
 import {
   leadInputSchema,
   leadUpdateSchema,
+  preapprovalDeleteSchema,
   settingsSchema,
   vehicleInputSchema,
 } from "../lib/validation";
@@ -64,6 +67,17 @@ import { MediaUploadError, serveMedia, uploadVehicleImage } from "./media";
 import { verifyTurnstile } from "./turnstile";
 import { assertVehicleTransition } from "../lib/status";
 import { estimateFinancing, type FinancingSnapshot } from "../lib/financing";
+import {
+  decryptPreapproval,
+  encryptPreapproval,
+  preapprovalFingerprint,
+  PreapprovalCryptoError,
+} from "./preapproval-crypto";
+import {
+  PREAPPROVAL_CONSENT_VERSION,
+  preapprovalViewSchema,
+  type PreapprovalStoredData,
+} from "../lib/preapproval";
 
 type RequestOptions = {
   fetchImpl?: typeof fetch;
@@ -292,6 +306,7 @@ async function submitLead(
   if (!parsed.success)
     return errorResponse("Please check the form fields and try again.", 400);
   if (parsed.data.honeypot) return json({ ok: true });
+  const isPreapproval = parsed.data.leadType === "preapproval";
   const submissionKey = request.headers.get("Idempotency-Key");
   if (submissionKey !== null && !/^[A-Za-z0-9_-]{16,128}$/.test(submissionKey))
     return errorResponse("Invalid submission key", 400);
@@ -303,27 +318,41 @@ async function submitLead(
       Object.entries(parsed.data.utm).sort(([a], [b]) => a.localeCompare(b)),
     ),
   });
-  const submissionHash = Array.from(
-    new Uint8Array(
-      await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(fingerprint),
-      ),
-    ),
-  )
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  // A retry after a lost response must work even though Turnstile consumed its token.
-  if (submissionKey) {
-    const existing = await findSubmission(env.DB, submissionKey);
-    if (existing)
-      return existing.hash === submissionHash
-        ? json({ ok: true, leadId: existing.id })
-        : errorResponse(
-            "This submission key was already used for different form details.",
-            409,
-          );
+  const existing = submissionKey
+    ? await findSubmission(env.DB, submissionKey)
+    : null;
+  let submissionHash: string;
+  try {
+    // A keyed fingerprint protects low-entropy identifiers against offline guesses.
+    // Retried requests must use the key version that signed the original request.
+    submissionHash = isPreapproval
+      ? await preapprovalFingerprint(env, fingerprint, existing?.hash)
+      : Array.from(
+          new Uint8Array(
+            await crypto.subtle.digest(
+              "SHA-256",
+              new TextEncoder().encode(fingerprint),
+            ),
+          ),
+        )
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+  } catch (error) {
+    if (error instanceof PreapprovalCryptoError)
+      return errorResponse(
+        "Secure applications are temporarily unavailable. Please try again later.",
+        503,
+      );
+    throw error;
   }
+  // A retry after a lost response must work even though Turnstile consumed its token.
+  if (existing)
+    return existing.hash === submissionHash
+      ? json({ ok: true, leadId: existing.id })
+      : errorResponse(
+          "This submission key was already used for different form details.",
+          409,
+        );
   const verifier = options.turnstileImpl ?? verifyTurnstile;
   const tokenResult =
     !env.TURNSTILE_SECRET_KEY &&
@@ -362,7 +391,7 @@ async function submitLead(
       return errorResponse("That vehicle is no longer available.", 409);
   }
   let financing: FinancingSnapshot | undefined;
-  if (parsed.data.leadType === "financing") {
+  if (parsed.data.financing) {
     const selection = parsed.data.financing;
     if (
       !vehicle ||
@@ -390,48 +419,88 @@ async function submitLead(
       calculatedAt: nowIso(),
     };
   }
-  const saved = await saveLeadAndNotification(
-    env.DB,
-    {
-      vehicleId: vehicle?.id ?? null,
-      leadType: parsed.data.leadType,
-      name: parsed.data.name,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email ?? null,
-      preferredContact:
-        parsed.data.leadType === "trade_sell"
-          ? parsed.data.phone
-            ? "phone"
-            : parsed.data.email
-              ? "email"
-              : "wechat"
-          : parsed.data.preferredContact,
-      message: parsed.data.message ?? null,
-      details:
-        parsed.data.leadType === "trade_sell"
-          ? {
-              vin: parsed.data.vin ?? undefined,
-              mileage: parsed.data.mileage ?? undefined,
-              wechat: parsed.data.wechat ?? undefined,
-            }
-          : financing
-            ? { financing }
-            : {},
-      sourceUrl: parsed.data.sourceUrl ?? request.url,
-      referrer: parsed.data.referrer ?? request.headers.get("Referer"),
-      utm: parsed.data.utm,
-      country: request.headers.get("CF-IPCountry"),
-      ipHash: await hashIp(
-        request.headers.get("CF-Connecting-IP"),
-        env.IP_HASH_SALT,
-      ),
-    },
-    {
-      key: submissionKey,
-      hash: submissionHash,
-      recipient: env.EMAIL_TO?.trim() ?? "",
-    },
-  );
+  const submittedAt = nowIso();
+  const application: PreapprovalStoredData | undefined = isPreapproval
+    ? {
+        ...parsed.data.preapproval!,
+        name: parsed.data.name,
+        phone: parsed.data.phone!,
+        email: parsed.data.email!,
+        submittedAt,
+        consentVersion: PREAPPROVAL_CONSENT_VERSION,
+      }
+    : undefined;
+  let saved: Awaited<ReturnType<typeof saveLeadAndNotification>>;
+  try {
+    saved = await saveLeadAndNotification(
+      env.DB,
+      {
+        vehicleId: vehicle?.id ?? null,
+        leadType: parsed.data.leadType,
+        name: isPreapproval ? "Pre-approval applicant" : parsed.data.name,
+        phone: isPreapproval ? null : (parsed.data.phone ?? null),
+        email: isPreapproval ? null : (parsed.data.email ?? null),
+        preferredContact:
+          parsed.data.leadType === "trade_sell"
+            ? parsed.data.phone
+              ? "phone"
+              : parsed.data.email
+                ? "email"
+                : "wechat"
+            : parsed.data.preferredContact,
+        message: isPreapproval ? null : (parsed.data.message ?? null),
+        details:
+          parsed.data.leadType === "trade_sell"
+            ? {
+                vin: parsed.data.vin ?? undefined,
+                mileage: parsed.data.mileage ?? undefined,
+                wechat: parsed.data.wechat ?? undefined,
+              }
+            : {
+                ...(financing ? { financing } : {}),
+                ...(isPreapproval
+                  ? {
+                      preapproval: {
+                        status: "received" as const,
+                        submittedAt,
+                        deletedAt: null,
+                      },
+                    }
+                  : {}),
+              },
+        sourceUrl: isPreapproval
+          ? new URL(
+              `/inventory/${encodeURIComponent(vehicle!.slug)}`,
+              env.APP_ORIGIN ?? new URL(request.url).origin,
+            ).toString()
+          : (parsed.data.sourceUrl ?? request.url),
+        referrer: isPreapproval
+          ? null
+          : (parsed.data.referrer ?? request.headers.get("Referer")),
+        utm: isPreapproval ? {} : parsed.data.utm,
+        country: request.headers.get("CF-IPCountry"),
+        ipHash: await hashIp(
+          request.headers.get("CF-Connecting-IP"),
+          env.IP_HASH_SALT,
+        ),
+      },
+      {
+        key: submissionKey,
+        hash: submissionHash,
+        recipient: env.EMAIL_TO?.trim() ?? "",
+      },
+      application
+        ? { encrypt: (leadId) => encryptPreapproval(env, application, leadId) }
+        : undefined,
+    );
+  } catch (error) {
+    if (error instanceof PreapprovalCryptoError)
+      return errorResponse(
+        "Secure applications are temporarily unavailable. Please try again later.",
+        503,
+      );
+    throw error;
+  }
   if (saved.hash !== submissionHash)
     return errorResponse(
       "This submission key was already used for different form details.",
@@ -750,6 +819,49 @@ async function adminApi(
       new URL(request.url).searchParams.get("status"),
     ) as LeadStatus | null;
     return json({ leads: await listLeads(env.DB, status ?? undefined) });
+  }
+  const preapprovalMatch = path.match(
+    /^\/api\/admin\/leads\/([^/]+)\/preapproval\/(view|delete)$/,
+  );
+  if (preapprovalMatch && request.method === "POST") {
+    const id = decodeURIComponent(preapprovalMatch[1]);
+    const action = preapprovalMatch[2];
+    const lead = await getLead(env.DB, id);
+    if (
+      lead?.leadType !== "preapproval" ||
+      lead.details.preapproval?.status !== "received"
+    )
+      return errorResponse("Application not found", 404);
+    const body = await parseJsonBody(request);
+    if (action === "delete") {
+      if (!preapprovalDeleteSchema.safeParse(body).success)
+        return errorResponse("Confirm application deletion", 400);
+      if (!(await deletePreapprovalApplication(env.DB, id, email)))
+        return errorResponse("Application not found", 404);
+      return json({ ok: true, lead: await getLead(env.DB, id) });
+    }
+    const parsed = preapprovalViewSchema.safeParse(body);
+    if (!parsed.success)
+      return errorResponse("Choose a reason for viewing this application", 400);
+    // Persist access accountability before obtaining any plaintext. Audit reasons
+    // are fixed codes so identifiers cannot be copied into free-text audit logs.
+    await addAudit(env.DB, email, "preapproval_viewed", "lead", id, {
+      reason: parsed.data.reason,
+    });
+    const ciphertext = await getPreapprovalCiphertext(env.DB, id);
+    if (!ciphertext) return errorResponse("Application not found", 404);
+    try {
+      return json({
+        application: await decryptPreapproval(env, ciphertext, id),
+      });
+    } catch (error) {
+      if (error instanceof PreapprovalCryptoError)
+        return errorResponse(
+          "Secure applications are temporarily unavailable. Please try again later.",
+          503,
+        );
+      throw error;
+    }
   }
   const retryMatch = path.match(/^\/api\/admin\/leads\/([^/]+)\/email\/retry$/);
   if (retryMatch && request.method === "POST") {
