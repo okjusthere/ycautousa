@@ -1,0 +1,120 @@
+.vehicle-selling-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vehicle-selling-points li {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 3px;
+  background: #a92e25;
+  padding: 5px 9px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vehicle-card-media .vehicle-selling-points {
+  position: absolute;
+  top: 11px;
+  left: 11px;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: calc(100% - 22px);
+  pointer-events: none;
+}
+.vehicle-card-media:has(.status-pill) .vehicle-selling-points {
+  max-width: calc(100% - 108px);
+}
+.detail-copy > .vehicle-selling-points {
+  margin: -10px 0 24px;
+}
+.selling-points-editor {
+  min-inline-size: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.selling-points-editor legend {
+  margin-bottom: 10px;
+  padding: 0;
+}
+.selling-points-editor h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.selling-points-editor > p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.selling-points-editor > .form-error {
+  margin-top: 12px;
+  color: var(--red-dark);
+}
+.selling-point-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.selling-point-preset {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.selling-point-preset:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.selling-points-editor button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.selling-point-edit-row {
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  padding: 16px;
+}
+.selling-point-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+.selling-point-row-heading > div {
+  display: flex;
+  gap: 16px;
+}
+.selling-point-edit-row .editor-fields {
+  margin-bottom: 0;
+}
+.selling-point-preview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+  border: 1px dashed var(--line);
+  padding: 14px;
+}
+.selling-point-preview > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.selling-points-editor > .selling-points-save-hint {
+  margin: 14px 0 0;
+}

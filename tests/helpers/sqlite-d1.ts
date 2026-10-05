@@ -18,6 +18,7 @@ export class SqliteD1 implements D1Like {
       "0006_reliable_notifications.sql",
       "0007_financing_settings.sql",
       "0008_secure_preapproval.sql",
+      "0009_vehicle_selling_points.sql",
     ])
       this.sqlite.exec(
         readFileSync(

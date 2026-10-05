@@ -5,6 +5,7 @@ import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/space-grotesk";
 import "./styles/global.css";
 import "./styles/financing.css";
+import "./styles/selling-points.css";
 import App from "./App";
 import { ApplicationErrorBoundary } from "../components/ApplicationErrorBoundary";
 

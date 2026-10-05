@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Vehicle } from "../lib/types";
 import { demoImage } from "../src/demo";
 import { Icon } from "./Icon";
+import { MAX_SELLING_POINTS } from "../lib/selling-points";
 import {
   formatLocalizedMileage,
   formatLocalizedPrice,
@@ -33,6 +34,32 @@ export function StatusPill({ status }: { status: Vehicle["status"] }) {
   );
 }
 
+export function VehicleSellingPoints({ vehicle }: { vehicle: Vehicle }) {
+  const { locale } = useLocale();
+  if (vehicle.status !== "available" && vehicle.status !== "pending")
+    return null;
+  const labels = (vehicle.sellingPoints ?? [])
+    .slice(0, MAX_SELLING_POINTS)
+    .map(
+      (point) =>
+        point[locale].trim() || point[locale === "zh" ? "en" : "zh"].trim(),
+    )
+    .filter(Boolean);
+  if (!labels.length) return null;
+  return (
+    <ul
+      className="vehicle-selling-points"
+      aria-label={locale === "zh" ? "车辆卖点" : "Vehicle highlights"}
+    >
+      {labels.map((label, index) => (
+        <li key={index} title={label}>
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function VehicleCard({
   vehicle,
   admin = false,
@@ -61,6 +88,7 @@ export function VehicleCard({
         {vehicle.status !== "available" && (
           <StatusPill status={vehicle.status} />
         )}
+        <VehicleSellingPoints vehicle={vehicle} />
       </Link>
       <div className="vehicle-card-body">
         <div className="vehicle-card-top">

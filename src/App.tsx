@@ -45,6 +45,7 @@ import {
   StatusPill,
   VehicleCard,
   VehicleMiniRow,
+  VehicleSellingPoints,
   vehicleImage,
 } from "../components/VehicleCard";
 import { LeadForm } from "../components/LeadForm";
@@ -52,6 +53,11 @@ import { VehiclePaymentCalculator } from "../components/VehiclePaymentCalculator
 import { FinancingSettings } from "../components/FinancingSettings";
 import { FinancingSummary } from "../components/FinancingSummary";
 import { PreapprovalApplicationPanel } from "../components/PreapprovalApplicationPanel";
+import { VehicleSellingPointsEditor } from "../components/VehicleSellingPointsEditor";
+import {
+  sellingPointsSchema,
+  type VehicleSellingPoint,
+} from "../lib/selling-points";
 import {
   LeadNotificationPanel,
   notificationLabel,
@@ -1030,6 +1036,7 @@ function VehicleDetailPage() {
               {vehicle.bodyType ?? copy.detail.preownedVehicle}
             </p>
             <h1>{vehicle.title}</h1>
+            <VehicleSellingPoints vehicle={vehicle} />
             {!sold && vehicle.priceCents !== null && vehicle.priceCents > 0 ? (
               <VehiclePaymentCalculator
                 key={vehicle.id}
@@ -2216,6 +2223,7 @@ type EditorState = {
   engine: string;
   description: string;
   features: string;
+  sellingPoints: VehicleSellingPoint[];
   images: VehicleImage[];
 };
 
@@ -2283,6 +2291,7 @@ const blankEditor: EditorState = {
   engine: "",
   description: "",
   features: "",
+  sellingPoints: [],
   images: [],
 };
 function editorFromVehicle(vehicle: Vehicle): EditorState {
@@ -2307,6 +2316,7 @@ function editorFromVehicle(vehicle: Vehicle): EditorState {
     engine: vehicle.engine ?? "",
     description: vehicle.description ?? "",
     features: vehicle.features.join("\n"),
+    sellingPoints: vehicle.sellingPoints ?? [],
     images: vehicle.images ?? [],
   };
 }
@@ -2487,6 +2497,11 @@ function AdminVehicleEditorPage() {
     }
   }
   function vehiclePayload(status: VehicleStatus = state.status) {
+    const sellingPoints = sellingPointsSchema.safeParse(state.sellingPoints);
+    if (!sellingPoints.success)
+      throw new Error(
+        "请检查卖点标签：每个标签至少填写一种语言，内容不能重复或超出长度限制。",
+      );
     return {
       status,
       featured: status === "available" ? state.featured : false,
@@ -2509,6 +2524,7 @@ function AdminVehicleEditorPage() {
       fuelType: state.fuelType || null,
       engine: state.engine || null,
       description: state.description || null,
+      sellingPoints: sellingPoints.data,
       features: state.features
         .split("\n")
         .map((value) => value.trim())
@@ -3063,6 +3079,14 @@ function AdminVehicleEditorPage() {
               </div>
             </Field>
           </div>
+        </section>
+        <section className="form-section">
+          <VehicleSellingPointsEditor
+            value={state.sellingPoints}
+            onChange={(points) => set("sellingPoints", points)}
+            disabled={photosDisabled}
+            sold={state.status === "sold"}
+          />
         </section>
         <section className="form-section">
           <div className="form-section-heading">

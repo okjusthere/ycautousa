@@ -29,3 +29,9 @@ The 619-or-below option opens the pre-approval form instead of showing a monthly
 The form requires name, phone, email, SSN, residential address, residence duration and collection consent. Identity and contact details are encrypted separately from the ordinary Leads inbox. Notification emails only announce the request and link to the protected lead.
 
 Open a pre-approval lead, choose a purpose, then click **View full application (including SSN)**. The view is audited and clears after 60 seconds, when the tab is hidden, or when the browser loses focus. Use **Show SSN** only when needed. Avoid copying private details into ordinary notes or email. **Delete private application data** clears the active encrypted application after confirmation while retaining the lead receipt and audit history. See [pre-approval operations](PREAPPROVAL.md) for retention and key recovery details.
+
+## Vehicle selling-point labels / 卖点标签
+
+Open **Vehicles → Edit vehicle → 卖点标签 / Selling points** below Pricing & mileage. Select a preset such as **低首付 / Low down payment** or **低里程 / Low mileage**, or choose **添加自定义标签** to write your own. Each vehicle supports up to two labels, each with up to 12 Chinese-field characters and 28 English-field characters. At least one language is required; an empty translation falls back to the other language. Presets fill both languages and remain editable. Use **删除** to remove a label or **上移** to change the display order, then save the vehicle normally.
+
+These are manually assigned selling points; the website does not infer financing offers or mileage claims. Labels appear on the photo's upper left in homepage/inventory cards and below the vehicle title on the detail page. Available and pending vehicles show their labels; the pending status badge remains separate. Sold vehicles keep their Sold badge and hide selling-point labels. Changing status does not erase saved labels. Vehicles without labels keep their existing appearance.

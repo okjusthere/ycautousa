@@ -1,5 +1,8 @@
 import type { FinancingConfig, FinancingSnapshot } from "./financing";
 import type { PreapprovalMetadata } from "./preapproval";
+import type { VehicleSellingPoint } from "./selling-points";
+
+export type { VehicleSellingPoint } from "./selling-points";
 
 export const VEHICLE_STATUSES = [
   "available",
@@ -42,6 +45,7 @@ export type Vehicle = {
   engine: string | null;
   description: string | null;
   features: string[];
+  sellingPoints?: VehicleSellingPoint[];
   legacyUrl: string | null;
   createdAt: string;
   updatedAt: string;

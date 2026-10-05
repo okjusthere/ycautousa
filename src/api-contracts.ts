@@ -1,4 +1,5 @@
 import { isRecord } from "./http";
+import { sellingPointsSchema } from "../lib/selling-points";
 import {
   preapprovalMetadataSchema,
   preapprovalStoredDataSchema,
@@ -85,6 +86,8 @@ export function validVehicle(value: unknown): boolean {
     ]) &&
     Array.isArray(value.features) &&
     value.features.every((feature) => typeof feature === "string") &&
+    (value.sellingPoints === undefined ||
+      sellingPointsSchema.safeParse(value.sellingPoints).success) &&
     (value.images === undefined ||
       (Array.isArray(value.images) &&
         value.images.every(

@@ -10,6 +10,7 @@ import type {
   VehicleImage,
   VehicleStatus,
   InventoryFacets,
+  VehicleSellingPoint,
 } from "./types";
 import { nowIso, uid } from "./utils";
 import {
@@ -20,6 +21,7 @@ import {
 import { financingSnapshotSchema, parseFinancingConfig } from "./financing";
 import { preapprovalMetadataSchema } from "./preapproval";
 import type { SettingsInput } from "./validation";
+import { parseSellingPoints, sellingPointsSchema } from "./selling-points";
 
 export type D1Result<T = unknown> = {
   results: T[];
@@ -85,6 +87,7 @@ export function rowToVehicle(
     engine: nullable(row.engine),
     description: nullable(row.description),
     features,
+    sellingPoints: parseSellingPoints(row.selling_points_json),
     legacyUrl: nullable(row.legacy_url),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
@@ -598,6 +601,7 @@ export type VehicleWrite = {
   engine?: string | null;
   description?: string | null;
   features: string[];
+  sellingPoints?: VehicleSellingPoint[];
   legacyUrl?: string | null;
 };
 
@@ -625,9 +629,13 @@ export async function upsertVehicle(
       ? null
       : (existing?.published_at ?? updatedAt);
   const soldAt = input.status === "sold" ? updatedAt : null;
+  const sellingPointsJson =
+    input.sellingPoints === undefined
+      ? null
+      : JSON.stringify(sellingPointsSchema.parse(input.sellingPoints));
   const sql = existing
-    ? `UPDATE vehicles SET slug=?, status=?, featured=?, title=?, year=?, make=?, model=?, trim=?, vin=?, stock_number=?, price_cents=?, mileage=?, exterior_color=?, interior_color=?, body_type=?, drivetrain=?, transmission=?, fuel_type=?, engine=?, description=?, features_json=?, legacy_url=?, updated_at=?, published_at=CASE WHEN ? IN ('draft','hidden') THEN NULL WHEN ? IS NOT NULL THEN ? ELSE published_at END, sold_at=? WHERE id=?`
-    : `INSERT INTO vehicles (id,slug,status,featured,title,year,make,model,trim,vin,stock_number,price_cents,mileage,exterior_color,interior_color,body_type,drivetrain,transmission,fuel_type,engine,description,features_json,legacy_url,created_at,updated_at,published_at,sold_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+    ? `UPDATE vehicles SET slug=?, status=?, featured=?, title=?, year=?, make=?, model=?, trim=?, vin=?, stock_number=?, price_cents=?, mileage=?, exterior_color=?, interior_color=?, body_type=?, drivetrain=?, transmission=?, fuel_type=?, engine=?, description=?, features_json=?, selling_points_json=COALESCE(?,selling_points_json), legacy_url=?, updated_at=?, published_at=CASE WHEN ? IN ('draft','hidden') THEN NULL WHEN ? IS NOT NULL THEN ? ELSE published_at END, sold_at=? WHERE id=?`
+    : `INSERT INTO vehicles (id,slug,status,featured,title,year,make,model,trim,vin,stock_number,price_cents,mileage,exterior_color,interior_color,body_type,drivetrain,transmission,fuel_type,engine,description,features_json,selling_points_json,legacy_url,created_at,updated_at,published_at,sold_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
   const vehicleValues = [
     input.slug,
     input.status,
@@ -650,6 +658,7 @@ export async function upsertVehicle(
     input.engine ?? null,
     input.description ?? null,
     JSON.stringify(input.features),
+    existing ? sellingPointsJson : (sellingPointsJson ?? "[]"),
     input.legacyUrl ?? null,
   ];
   const values = existing

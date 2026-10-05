@@ -2,6 +2,7 @@ import { z } from "zod";
 import { LEAD_STATUSES, VEHICLE_STATUSES } from "./types";
 import { financingConfigSchema, financingSelectionSchema } from "./financing";
 import { preapprovalInputSchema, preapprovalPhoneSchema } from "./preapproval";
+import { sellingPointsSchema } from "./selling-points";
 
 export const vinSchema = z
   .string()
@@ -50,6 +51,8 @@ export const vehicleInputSchema = z.object({
   engine: z.string().trim().max(120).nullable().optional(),
   description: z.string().trim().max(10_000).nullable().optional(),
   features: z.array(z.string().trim().min(1).max(120)).max(60).default([]),
+  // Legacy editors omit this field; only an explicit empty array clears it.
+  sellingPoints: sellingPointsSchema.optional(),
 });
 
 export const leadInputSchema = z
