@@ -1029,7 +1029,7 @@ function VehicleDetailPage() {
           <span>{vehicle.title}</span>
         </div>
         <div className="container detail-layout">
-          <div className="gallery">{galleryPhotos.slice(0, 3)}</div>
+          <div className="gallery">{galleryPhotos}</div>
           <div className="detail-copy">
             <p className="eyebrow">
               {vehicle.year ?? "—"} /{" "}
@@ -1138,11 +1138,6 @@ function VehicleDetailPage() {
             )}
           </div>
         </div>
-        {galleryPhotos.length > 3 && (
-          <div className="container detail-gallery-more">
-            {galleryPhotos.slice(3)}
-          </div>
-        )}
       </section>
       {similar.length > 0 && (
         <section className="section detail-similar">
